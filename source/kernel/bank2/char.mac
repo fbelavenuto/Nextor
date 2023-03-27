@@ -810,7 +810,6 @@ JOY_RIGHT:	ld	a,(IN_COUNT##)
 		inc	hl			;Move cursor by getting the
 		inc	b			; character and calling the
 		ld	a,(hl)			; routine to print it. This
-
 		pcall	CHK_16_CHAR		;1st byte of 16 bit char?
 		jp	nc,OUT_CHAR		;no
 ;
@@ -818,7 +817,6 @@ JOY_RIGHT:	ld	a,(IN_COUNT##)
 		inc	hl
 		inc	b
 		ld	a,(hl)
-
 		jp	OUT_CHAR		; takes care of tabs etc.
 ;
 ;	----------------------------------------
@@ -852,7 +850,6 @@ LEFT_TO_B:
 ;
 count_loop:	inc	hl
 		ld	a,(hl)			;Get next character in buffer.
-
 		pcall	CHK_16_CHAR
 		jr	nc,not_16_char		;Go if not 16 bit char.
 ;
@@ -918,7 +915,6 @@ DEL_RIGHT:	ld	a,(IN_COUNT##)
 		ld	(IN_COUNT##),a		;Decrement character count.
 SHIFT:		sub	b			;A=number of chars to right.
 		jr	z,NO_SHIFT2
-
 		ld	e,a			;save it
 		inc	hl			;on 1st byte of 16 bit char?
 		ld	a,(hl)

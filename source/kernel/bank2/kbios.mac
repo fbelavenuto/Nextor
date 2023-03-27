@@ -199,7 +199,6 @@ FLUSH_BUF:
 		dec	a			;If count goes to zero then
 		jr	z,no_flush_16ch		; skip the actual flushing.
 not_1st_of_16:
-
 		ld	b,a			;If we are in the middle of an
 		ld	a,(ESCCNT##)		; escape sequence then do not
 		or	a			; include the "cursor off"

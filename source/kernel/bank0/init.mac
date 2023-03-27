@@ -169,8 +169,8 @@ DOSV0::
 ;
 _$DSKBASIC::
 	defb	 "Nextor "
-	defb	NXTVER##+"0", ".", NXTV_HI##+"0" 
-	defb    ".", NXTV_LO##+"0"
+	defb	MAIN_NEXTOR_VERSION##+"0", ".", SEC_NEXTOR_VERSION_HIGH##+"0" 
+	defb    ".", SEC_NEXTOR_VERSION_LOW##+"0"
 	defb     " BASIC"
 	defb	 0
 ;

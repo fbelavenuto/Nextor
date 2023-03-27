@@ -1357,7 +1357,6 @@ KKANJTBL:
 ;
 		push	hl
 		ld	hl,KANJTABLE##
-
 		cp	(hl)
 		inc	hl			;Skip if character is below
 		jr	c,not_16bit_1		; the lower limit.

@@ -42,7 +42,6 @@ ALLOC:
 	ld	a,h
 	cp	high (BOOTAD+512)
 	ret	c		;no room left
-
 	ld	de,(BOTTOM)	;get current RAM bottom
 	sbc	hl,de		;get memory space left after allocation
 	ret	c		;no space left

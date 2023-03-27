@@ -510,7 +510,6 @@ adjust_done:
 		ld	(hl),e
 		inc	hl
 		ld	(hl),d
-
 		ld	bc,_patch_61-_patch_16-1
 		add	hl,bc
 		ld	(hl),e
@@ -521,7 +520,6 @@ adjust_done:
 		ld	(hl),e
 		inc	hl
 		ld	(hl),d
-
 		pop	de
 ;
 ram_not_exp:
@@ -734,7 +732,6 @@ _$DOSON:	push	af
 _$DOSOFF:	push	af
 		ld	a,i
 		push	af
-
 		ld	a,(RAMAD1##)		;Get RAM slot address
 ;
 _dos_on_off:	push	hl

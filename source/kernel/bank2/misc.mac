@@ -465,7 +465,6 @@ FCISN:
 		inc	(hl)
 dp_clu_noinc:	ex	de,hl
 		pop	de
-
 		ld	b,32-24
 		xor	a
 dp_clear_loop:	ld	(de),a			;Clear the rest of the
@@ -479,7 +478,6 @@ dp_clear_loop:	ld	(de),a			;Clear the rest of the
 		ld	h,(ix+UD_CLUSTER_COUNT##+1)	; and subtract 2 to get the
 		dec	hl			; actual number of data clusters.
 		ld	b,(ix+UD_CLUSTER_SHIFT##)
-
 		;assume A=0 and Cy=0 (set "xor a")
 		code	MVI C			;Skip "ADD HL,HL" first time
 dp_shift_lp:	add	hl,hl			;Shift this according to the

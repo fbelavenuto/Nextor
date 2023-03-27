@@ -173,7 +173,7 @@ read_device:	ld	l,(ix+FAB_VOLUME_ID##+2)	;HL -> first entry in jump
 		push	bc			;Save total number of bytes
 
 		res	MD_EOF,(ix+FAB_MODE##)	;Clear end-of-file condition.
-endif
+
 rd_dev_loop:	push	bc
 		push	ix
 		push	de

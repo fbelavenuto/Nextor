@@ -170,7 +170,6 @@ read_boot_ok:	ld	a,c			;Set current drive to the
 		or	a
 		ret
 ;
-
 PPAT1:
 		push	hl
 		ld	l,0C3h	;JP
@@ -299,7 +298,6 @@ msxdos_bootok:
 ;
 		ld	a,(CUR_DRV##)		;Record the drive in case
 		ld	(BOOT_DRV##),a		; we ever need to reboot.
-
 		ld	a,0C3h
 		ld	($DOSON##),a		;Activate these routines.
 		ld	($DOSOFF##),a		;

@@ -143,7 +143,6 @@ first_buf_ok:
 		inc	hl			; buffer descriptor.
 		inc	hl
 		push	hl
-
 		ld	e,l			;Pad out the sector buffer
 		ld	d,h			; with zero to make a clean
 		inc	de			; starting point for new

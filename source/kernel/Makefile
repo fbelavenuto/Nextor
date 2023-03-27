@@ -8,7 +8,7 @@
 # N80=/path/to/N80 make
 
 
-VERSION := 2.1.1
+VERSION := 3.0.0
 
 ifeq ($(strip $(N80)),)
 N80=N80

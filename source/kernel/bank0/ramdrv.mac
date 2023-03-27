@@ -157,7 +157,6 @@ sec_slot_loop:	ld	c,a			; registers.  This vile code
 		pop	hl
 		inc	hl			; used for mapper segments.
 		call	nz,SSLOTE##
-
 		ld	a,c
 		add	a,01000000b
 		jr	nz,sec_slot_loop
@@ -253,7 +252,6 @@ not_sector_0:
 		add	hl,hl
 		pop	af
 		call	PUT_P2##
-
 		sbc	hl,de			; than could possibly fit
 		ld	a,12			; in 255 segments then
 		ret	c			; return an error.
@@ -332,7 +330,6 @@ make_upb_ok:	exx
 		inc	hl
 ;
 		ld	(hl),1			;One sector per cluster
-
 		cp	4096/32+1		;If number of clusters won't
 		jr	c,fit_12bit_1		; fit 12-bit, two sectors
 		inc	(hl)			; per cluster
@@ -376,7 +373,6 @@ fit_12bit_1:
 		add	hl,hl
 		add	hl,hl
 		add	hl,hl
-
 		inc	hl			; and one more for boot sector
 
 		ex	de,hl
