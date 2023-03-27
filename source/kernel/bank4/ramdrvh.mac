@@ -1,5 +1,7 @@
-﻿	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+﻿	name('ramdrvh')
+
+	INCLUDE ../macros.inc
+	INCLUDE	../const.inc
 	
 	include b4rdlabs.inc
 

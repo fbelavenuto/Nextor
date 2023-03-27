@@ -5,11 +5,19 @@
 	; By Piter Punk
 	; By FRS
 
+	;MASTER_ONLY constant must be defined externally to generate the master-only variant.
+
 	org	4000h
 	ds	4100h-$,0		; DRV_START must be at 4100h
 DRV_START:
 
+	.RELAB
+
 TESTADD	equ	0F3F5h
+
+;A few Panasonic FS machines uses the area around C000-C400 at boot time,
+;so better to not use C000; C400 will do.
+TEMP_WORK equ 0C400h
 
 ;-----------------------------------------------------------------------------
 ;
@@ -38,7 +46,7 @@ VER_REV		equ	7
 
 
 ;Miscellaneous configuration
- DEFINE	PIOMODE3	; Configure devices to work on PIO MODE 3
+PIOMODE3 equ 0FFFFh	; Configure devices to work on PIO MODE 3
 
 
 ;This is a very barebones driver. It has important limitations:
@@ -113,19 +121,21 @@ M_SRST	equ	100b ;(1 SHL SRST)
 
 ; IDE commands
 
-ATACMD:
+module ATACMD
 .PRDSECTRT	equ	#20
 .PWRSECTRT	equ	#30
 .DEVDIAG	equ	#90
 .IDENTIFY	equ	#EC
 .SETFEATURES	equ	#EF
+endmod
 
-ATAPICMD:
+module ATAPICMD
 .RESET		equ	#08
 .PACKET		equ	#A0
 .IDENTPACKET	equ	#A1
+endmod
 
-PACKETCMD:
+module PACKETCMD
 .RQSENSE	equ	#03	;
 .RDCAPACITY	equ	#25	; Read the media capacity
 .READ10		equ	#28	; Read sectors (16bit)
@@ -133,6 +143,7 @@ PACKETCMD:
 .WRITE10	equ	#2A	; Write sectors (16bit)
 .WRITE12	equ	#AA	; Write sectors (32bit)
 .GTMEDIASTAT	equ	#DA	; Get media status
+endmod
 
 
 ;-----------------------------------------------------------------------------
@@ -204,50 +215,79 @@ EXPTBL	equ	#FCC1
 ; LUN type bits are always 00.
 
 
- STRUCT DEVINFO		; Contains information about a specific device
-BASE			; Offset to the base of the data structure
-t321D		db
-t7654		db
+;--- These macros allow defining a struct with fields of a given size,
+;    a constant will be generated for each field with the format "structname.fieldname".
+;    They will also have a BASE, FIELD and _SIZE fields.
+
+;* Macro start
+
+struct_start macro name
+module name
+root field_pointer
+field_pointer defl 0
+field BASE,0			; Offset to the base of the data structure 
+endm
+
+;* Macro end
+
+struct_end macro
+field END,0
+field _SIZE,(END-BASE)
+endmod
+endm
+
+;* Macro field
+
+field macro name,size
+name equ field_pointer
+field_pointer defl field_pointer+size
+endm
+
+
+struct_start DEVINFO		; Contains information about a specific device
+field t321D,1
+field t7654,1
 ;CHSRESERVED	ds 2	; Disabled to save space. 2 bytes won't be enough anyway
-SECTSIZE	dw	; Sector size for this device
-pBASEWRK	dw	; Cache pointer to go back to the base of the work area 
- ENDS
+field SECTSIZE,2	; Sector size for this device
+field pBASEWRK,2	; Cache pointer to go back to the base of the work area 
+struct_end
 
- STRUCT WRKAREA
-BASE			; Offset to the base of the data structure 
-BLKLEN		dw	; Size of the block to be copied. ***Must be
-			; \the first element of the WRKAREA
-PCTBUFF		ds 16	; Buffer to send ATAPI PACKET commands
-LDIRHLPR	ds 8	; LDIR data transter helper routine. This is
-			; in RAM to speed up the R800 copy a lot.
-MASTER		DEVINFO	; Offset to the MASTER data structure
-SLAVE		DEVINFO	; Offset to the SLAVE data structure
-			; \*** It must follow the MASTER DEVINFO
- ENDS
 
- STRUCT WRKTEMP
-pDEVMSG		dw	; Pointer to the text "Master:" or "Slave:"
-BUFFER		ds 512	; Buffer for the IDENTIFY info
- ENDS
+struct_start WRKAREA
+field BLKLEN,2	; Size of the block to be copied. ***Must be
+				; \the first element of the WRKAREA
+field PCTBUFF,16	; Buffer to send ATAPI PACKET commands
+field LDIRHLPR,8	; LDIR data transter helper routine. This is
+					; in RAM to speed up the R800 copy a lot.
+field MASTER,(:DEVINFO._SIZE)	; Offset to the MASTER data structure
+field SLAVE,(:DEVINFO._SIZE); Offset to the SLAVE data structure
+									  ; \*** It must follow the MASTER DEVINFO
+struct_end
+
+
+struct_start WRKTEMP
+field pDEVMSG,2	; Pointer to the text "Master:" or "Slave:"
+field BUFFER,512	; Buffer for the IDENTIFY info
+struct_end
 
 ; ATAPI/SCSI packet structures
- STRUCT PCTRW10		; PACKET READ10/WRITE10 structure
-OPCODE		db
-OPTIONS		db
-LBA		dd
-GROUP		db
-LENGHT		dw
-CONTROL		db
- ENDS
+struct_start PCTRW10		; PACKET READ10/WRITE10 structure
+field OPCODE,1
+field OPTIONS,1
+field LBA,4
+field GROUP,1
+field LENGHT,2
+field CONTROL,1
+struct_end
 
- STRUCT PCTRW12		; PACKET READ12/WRITE12 structure
-OPCODE		db
-OPTIONS		db
-LBA		dd
-LENGHT		dd
-GROUP		db
-CONTROL		db
- ENDS
+struct_start PCTRW12		; PACKET READ12/WRITE12 structure
+field OPCODE,1
+field OPTIONS,1
+field LBA,4
+field LENGHT,4
+field GROUP,1
+field CONTROL,1
+struct_end
 
 
 
@@ -445,7 +485,7 @@ DRV_TIMI:
 ;     get two allocated drives.)
 
 DRV_INIT:
-	ld	hl,WRKAREA	; size of work area
+	ld	hl,WRKAREA._SIZE	; size of work area
 	or	a		; Clear Cy
 	ret	z
 
@@ -468,7 +508,7 @@ DRV_INIT:
 	call	INIWORK			; Initialize the work-area
 	call	IDE_ON
 
-.init:	ld	(ix+WRKAREA.MASTER.t321D),#FE	; error: No master detected yet
+.init:	ld	(ix+WRKAREA.MASTER+DEVINFO.t321D),#FE	; error: No master detected yet
 	ld	de,INIT_S		; Print "Initializing: "
 	call	PRINT
 	ld	a,M_DEV			; Select SLAVE
@@ -493,7 +533,7 @@ DRV_INIT:
 	ld	a,(IDE_STATUS)
 	and	M_ERR			; Error bit set?
 	jr	nz,.diagchk		; on error, skip to diagnostics
-	ld	(ix+WRKAREA.MASTER.t321D),0	; Clear undetected master error
+	ld	(ix+WRKAREA.MASTER+DEVINFO.t321D),0	; Clear undetected master error
 
 .diagchk:
 	; Check the diagnostics and print the results 
@@ -509,16 +549,16 @@ DRV_INIT:
 
 .chkmaster:
 	ld	de,MASTER_S
-	ld	(TEMP_WORK.pDEVMSG),de
+	ld	(TEMP_WORK+WRKTEMP.pDEVMSG),de
 	call	PRINT
 
 	; Check for DIAGNOSTICS errors
-	ld	a,(ix+WRKAREA.MASTER.t321D)
+	ld	a,(ix+WRKAREA.MASTER+DEVINFO.t321D)
 	ld	c,a
 	bit	7,a			; Any error detected by DIAGNOSE?
 	jr	z,.detinit		; No, skip
 	call	DIAGERRPRT		; Print the diagnostic error
-	ld	(ix+WRKAREA.MASTER.t321D),0	; This device isn't available
+	ld	(ix+WRKAREA.MASTER+DEVINFO.t321D),0	; This device isn't available
 	; Errors 0 and 5 are critical and cannot proceed
 	ld	a,c
 	and	#7F			; Crop erro code
@@ -526,7 +566,7 @@ DRV_INIT:
 	cp	5			; Microcontroller error on master?
 	jp	nz,.chkslave		; No: slave can still be used safely
 .critical:
-	ld	(ix+WRKAREA.SLAVE.t321D),0	; No master = no slave
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.t321D),0	; No master = no slave
 	jp	DRV_INIT_END		; Finish DEV_INIT
 
 .detinit:
@@ -534,7 +574,7 @@ DRV_INIT:
 	call	SELDEV
 	call	WAIT_RST		; wait until ready
 	jr	nc,.detmaster
-	ld	(ix+WRKAREA.SLAVE.t321D),#80	; Slave has an error
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.t321D),#80	; Slave has an error
 
 .detmaster:
 	call	RESET_ALL.ataonly
@@ -544,31 +584,35 @@ DRV_INIT:
 	xor	a			; Select MASTER
 	call	DETDEV
 	pop	ix
-	ld	a,(ix+WRKAREA.MASTER.t321D)
+	ld	a,(ix+WRKAREA.MASTER+DEVINFO.t321D)
 	and	3		; There can't be a slave without a master
 	jr	z,INIT_MASTERFAIL	; Finish DEV_INIT
 
 .chkslave:
+	ifndef MASTER_ONLY
+
 	ld	de,SLAVE_S
-	ld	(TEMP_WORK.pDEVMSG),de
+	ld	(TEMP_WORK+WRKTEMP.pDEVMSG),de
 	call	PRINT
 
 	; Check for DIAGNOSTICS errors
-	ld	a,(ix+WRKAREA.SLAVE.t321D)
+	ld	a,(ix+WRKAREA.SLAVE+DEVINFO.t321D)
 	bit	7,a			; Any error detected by DIAGNOSE?
 	jr	z,.detslave		; No, skip to detection
 
 	call	DIAGERRPRT		; Print the diagnostic error
-	ld	(ix+WRKAREA.SLAVE.t321D),0	; This device isn't available
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.t321D),0	; This device isn't available
 	jp	DRV_INIT_END
 
 .detslave:
 	push	ix
-	ld	de,WRKAREA.SLAVE.BASE
+	ld	de,WRKAREA.SLAVE+DEVINFO.BASE
 	add	ix,de			; Point ix to the SLAVE work area
 	ld	a,M_DEV			; Select SLAVE
 	call	DETDEV
 	pop	ix
+
+	endif
 
 	; Reset all devices to finish
 END_DETECT:
@@ -605,8 +649,8 @@ INIT_ABORTED:
 INIT_MASTERFAIL:
 	ld	de,DIAGS_S.nomaster	; Print "failed">
 	call	PRINT
-.end:	ld	(ix+WRKAREA.MASTER.t321D),0
-	ld	(ix+WRKAREA.SLAVE.t321D),0
+.end:	ld	(ix+WRKAREA.MASTER+DEVINFO.t321D),0
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.t321D),0
 	jr	DRV_INIT_END
 
 
@@ -615,7 +659,7 @@ INIT_MASTERFAIL:
 ;--- Subroutines for the INIT procedure
 
 ; Input: A=target device
-;        (TEMP_WORK.pDEVMSG): Pointer to the "Master" or "Slave" text
+;        (TEMP_WORK+WRKTEMP.pDEVMSG): Pointer to the "Master" or "Slave" text
 DETDEV:
 	ld	c,a			; c=target device
 	ld	de,DETECT_S		; Print "detecting"
@@ -658,18 +702,18 @@ DETDEV:
  ENDIF
 
 	;--- Get the name of the device 
-	;(IDENTIFY device data on TEMP_WORK.BUFFER)
+	;(IDENTIFY device data on TEMP_WORK+WRKTEMP.BUFFER)
 .getinfo:
-	ld	de,(TEMP_WORK.pDEVMSG)
+	ld	de,(TEMP_WORK+WRKTEMP.pDEVMSG)
 	call	PRINT
 
 	;Print the device name.
-	ld	hl,TEMP_WORK.BUFFER+27*2
+	ld	hl,TEMP_WORK+WRKTEMP.BUFFER+27*2
 	ld	b,20
 	call	.prtword
 
 	; Print the firmware version
-	ld	hl,TEMP_WORK.BUFFER+23*2
+	ld	hl,TEMP_WORK+WRKTEMP.BUFFER+23*2
 	ld	b,4
 	call	.prtword
 
@@ -738,7 +782,7 @@ DETDEV:
 .nodevreason:
 	ld	(ix+DEVINFO.t321D),0	
 	push	de
-	ld	de,(TEMP_WORK.pDEVMSG)
+	ld	de,(TEMP_WORK+WRKTEMP.pDEVMSG)
 	call	PRINT			; Clear previous label message
 	pop	de
 	jp	PRINT
@@ -794,7 +838,7 @@ WAIT_RST:
 ;Input:  DIAGNOSTICS issued successfully.
 ;Output: A=devtype. 0=nodev, 1=CHS, 2=LBA, 3=ATAPI
 ;	 Cy=0 for device ok, 1 for no device or not usable.
-;        If device ok, 50 first bytes of IDENTIFY device copied to TEMP_WORK.
+;        If device ok, 50 first bytes of IDENTIFY device copied to TEMP_WORK+WRKTEMP.
 
 GETDEVTYPE:
 ; Input: none
@@ -873,7 +917,7 @@ GETDEVTYPE:
 	ret	c
 	ld	a,b			; a=devtype
 	ld	hl,IDE_DATA
-	ld	de,TEMP_WORK.BUFFER
+	ld	de,TEMP_WORK+WRKTEMP.BUFFER
 	ld	bc,512			;Read the IDENTIFY packet
 	ldir
 	ei
@@ -881,7 +925,7 @@ GETDEVTYPE:
 	ret	nc			; Yes, return
 
 .chkLBA:
-	ld      a,(TEMP_WORK.BUFFER+49*2+1)
+	ld      a,(TEMP_WORK+WRKTEMP.BUFFER+49*2+1)
 	and	2			; LBA supported?
 	ld	a,1			; devtype=CHS
 	ret	z			; No, return
@@ -1008,7 +1052,8 @@ DEV_RW2:
 	ld	b,0
 	ret	
 DEV_RW_NO0SEC:
-	ld	iy,de
+ 	ld iyl,e
+ 	ld iyh,d
 	ld	a,(iy+3)
 	and	11110000b
 	jp	nz,DEV_RW_NOSEC	;Only 28 bit sector numbers supported
@@ -1081,7 +1126,8 @@ DEV_ATAPI_RW:
 	push	de
 	ld	e,(ix+DEVINFO.pBASEWRK)		; hl=pointer to WorkArea
 	ld	d,(ix+DEVINFO.pBASEWRK+1)
-	ld	iy,de				; iy=WRKAREA pointer
+	ld iyl,e
+ 	ld iyh,d				; iy=WRKAREA pointer
 	pop	de
 
 	; Set the block size
@@ -1125,12 +1171,28 @@ DEV_ATAPI_RD:
 	ld	a,ATAPICMD.PACKET	; PIO send PACKET command 
 	call	PIO_CMD
 	jp	c,DEV_RW_ERR
-	push	bc,hl,iy
+	push	bc
+	push 	hl
+	push	iy
 	ld	iyl,1			; 1 block
 	ld	hl,WRKAREA.PCTBUFF
-	ld	bc,PCTRW10		; block size=10 bytes
+	ld	bc,PCTRW10._SIZE		; block size=10 bytes
 	call	WRITE_DATA		; Send the packet to the device
-	pop	iy,hl,bc
+
+	ifdef BAD_POPS
+
+	pop bc
+	pop hl
+	pop iy
+
+	else
+
+	pop	iy
+	pop hl
+	pop bc
+
+	endif
+
 	jp	c,DEV_RW_ERR
 
 .init1:	; Set the sector size and number of blocks
@@ -1148,7 +1210,8 @@ DEV_ATAPI_RD:
 	ld	c,a		; c=number of 512-byte blocks per sector
 
 	push	bc
-	ld	bc,de		; bc=block size
+ 	ld b,d
+	ld c,e		; bc=block size
 	call	SETLDIRHLPR	; hl'=Pointer to LDIR helper in RAM
 	pop	bc
 	ex	de,hl		; de=destination address
@@ -1179,12 +1242,28 @@ DEV_ATAPI_WR:
 	ld	a,ATAPICMD.PACKET	; PIO send PACKET command 
 	call	PIO_CMD
 	jp	c,DEV_RW_ERR
-	push	bc,hl,iy
+	push	bc
+	push	hl
+	push	iy
 	ld	iyl,1			; 1 block
 	ld	hl,WRKAREA.PCTBUFF
-	ld	bc,PCTRW10		; block size=10 bytes
+	ld	bc,PCTRW10._SIZE		; block size=10 bytes
 	call	WRITE_DATA		; Send the packet to the device
-	pop	iy,hl,bc
+
+	ifdef BAD_POPS
+
+	pop bc
+	pop hl
+	pop iy
+
+	else
+
+	pop	iy
+	pop hl
+	pop bc
+
+	endif
+
 	jp	c,DEV_RW_ERR
 
 .init1:	; Set the sector size and number of blocks
@@ -1202,7 +1281,8 @@ DEV_ATAPI_WR:
 	ld	c,a		; c=number of 512-byte blocks per sector
 
 	push	bc
-	ld	bc,de		; bc=block size
+ 	ld b,d
+ 	ld c,e		; bc=block size
 	call	SETLDIRHLPR	; hl'=Pointer to LDIR helper in RAM
 	pop	bc
 .loopsector:
@@ -1481,9 +1561,22 @@ DEV_STRING_GET:
 ;   	     B=Size of the string
 ; Modifies: AF, BC
 DEV_STRING_DIGEST:
-	push	bc,hl
+	push	bc
+	push	hl
 	call	DEV_STRING_GET
-	pop	iy,bc
+
+	ifdef BAD_POPS
+
+	pop bc
+	pop iy
+
+	else
+
+	pop	iy
+	pop	bc
+
+	endif
+
 	ret	c
 	ld	b,c
 
@@ -2096,7 +2189,7 @@ WAIT_DRQ:
 .wait1: ld	a,(IDE_STATUS)
 	rrca				; ERR=1?
 	jr	c,.end2			; Yes, abort with error
-	and	(M_DRQ>>1)		; DRQ=1?
+	and	(M_DRQ SHR 1)		; DRQ=1?
 	jr	nz,.end			; Yes, quit
 	ex	(sp),hl
 	ex	(sp),hl
@@ -2126,7 +2219,7 @@ WAIT_DRQ:
 	ld	a,(IDE_STATUS)
 	rrca				; error?
 	jr	c,.tend2		; Yes, abort with Cy=on
-	and	(M_DRQ>>1)		; DRQ=1?
+	and	(M_DRQ SHR 1)		; DRQ=1?
 	jr	nz,.tend		; Yes, quit
 	in	a,(#E7)
 	cp	250			; 250ms
@@ -2290,7 +2383,7 @@ RESET_ALL:
 
 
 CHKDIAG:
-	ld	a,(ix+WRKAREA.MASTER.t321D)
+	ld	a,(ix+WRKAREA.MASTER+DEVINFO.t321D)
 	inc	a			; Undetected master?
 	scf
 	ret	z			; Yes, quit with error
@@ -2301,7 +2394,7 @@ CHKDIAG:
 	jr	z,.chkslave		; No, skip
 .saveerrms:	; Save the error code from the master
 	or	#80
-	ld	(ix+WRKAREA.MASTER.t321D),a
+	ld	(ix+WRKAREA.MASTER+DEVINFO.t321D),a
 	bit	7,b			; Error on slave?
 	scf
 	ret	z			; No, quit
@@ -2316,7 +2409,7 @@ CHKDIAG:
 	ret	z			; No, quit
 .saveerrsl:	; Save the error code from the slave
 	or	#80
-	ld	(ix+WRKAREA.SLAVE.t321D),a
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.t321D),a
 	ld	a,b
 	cp	1			; Any error reported?
 	ret	z			; No, quit with Cy=off
@@ -2394,518 +2487,10 @@ WRITE_DATA:
 
 LDI512:	; Z80 optimized 512 byte transfer
 	exx
+	rept 512
 	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-	ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
-    ldi
+	endm
+
 	ret
 
 
@@ -2949,9 +2534,9 @@ MY_GWORK:
 	or	a
 	jr	z,.end
 	cp	1
-	ld	ix,WRKAREA.MASTER.BASE
+	ld	ix,WRKAREA.MASTER+DEVINFO.BASE
 	jr	z,.end
-	ld	ix,WRKAREA.SLAVE.BASE
+	ld	ix,WRKAREA.SLAVE+DEVINFO.BASE
 .end:	add	ix,de			; Point ix to the device work area
 	pop	de
 	ret
@@ -3065,7 +2650,7 @@ INIWORK:
 	push	ix
 	pop	hl
 	push	hl
-	ld	b,WRKAREA
+	ld	b,WRKAREA._SIZE
 	xor	a
 .clrwork2:
 	ld	(hl),a
@@ -3074,10 +2659,10 @@ INIWORK:
 
 	pop	hl
 	; Set the pointers to go back to the base of the WorkArea
-	ld	(ix+WRKAREA.MASTER.pBASEWRK),l
-	ld	(ix+WRKAREA.MASTER.pBASEWRK+1),h
-	ld	(ix+WRKAREA.SLAVE.pBASEWRK),l
-	ld	(ix+WRKAREA.SLAVE.pBASEWRK+1),h
+	ld	(ix+WRKAREA.MASTER+DEVINFO.pBASEWRK),l
+	ld	(ix+WRKAREA.MASTER+DEVINFO.pBASEWRK+1),h
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.pBASEWRK),l
+	ld	(ix+WRKAREA.SLAVE+DEVINFO.pBASEWRK+1),h
 
 	; Install the data transfer helper routine in the WorkArea 
 	; This speeds up the LDIR speed a lot for the R800
@@ -3124,7 +2709,7 @@ MYSETSCR:
 	jp	INITXT			; set screen0
 
 .notMSX1:
-	ld	c,$23			; Block-2, R#3
+	ld	c,23h			; Block-2, R#3
 	ld 	ix,REDCLK
 	call	EXTROM
 	and	1
@@ -3201,7 +2786,7 @@ INICHKSTOP:
 	call	PRINT
 .wait1:	ld	a,7
 	call	SNSMAT
-	and	$10			; Is STOP still pressed?
+	and	10h			; Is STOP still pressed?
 	jr	z,.wait1		; Wait for STOP to be released
 	xor	a
 	ld	(INTFLG),a		; Clear STOP flag
@@ -3248,7 +2833,14 @@ INICHKSTOP:
 
 INFO_S:
 	db	13,"Sunrise compatible IDE driver v",27,'J'
-	db	VER_MAIN+$30,'.',VER_SEC+$30,'.',VER_REV+$30
+	db	VER_MAIN+30h,'.',VER_SEC+30h,'.',VER_REV+30h
+
+	ifdef MASTER_ONLY
+
+	db 13,10,"Master device only edition"
+
+	endif
+
 CRLF_S:	db	13,10,0
 COPYRIGHT_S:
 	db	"(c) 2009 Konamiman",13,10
@@ -3269,8 +2861,13 @@ INIT_S:
 	db	13,"Initializing : ",27,'J',0
 MASTER_S:
 	db	13,"Master device: ",27,'J',0
+
+	ifndef MASTER_ONLY
+
 SLAVE_S:
 	db	13,"Slave device : ",27,'J',0
+
+	endif
 
 OK_S:	db	"Ok",13,10,0
 ERROR_S:
@@ -3298,9 +2895,9 @@ DIAGS_S:
 ;=======================
 ; Variables
 ;=======================
-	.phase	#C000
-TEMP_WORK	WRKTEMP
-	.dephase
+;	.phase	#C000
+;TEMP_WORK	WRKTEMP
+;	.dephase
 
 
 

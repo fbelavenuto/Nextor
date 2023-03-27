@@ -32,11 +32,11 @@
 #define CONOUT 2
 
 #ifdef SUPPORT_LONG
-extern void _ultoa(long val, char* buffer, char base);
-extern void _ltoa(long val, char* buffer, char base);
+extern void __ultoa(long val, char* buffer, char base);
+extern void __ltoa(long val, char* buffer, char base);
 #endif
-extern void _uitoa(int val, char* buffer, char base);
-extern void _itoa(int val, char* buffer, char base);
+extern void __uitoa(int val, char* buffer, char base);
+extern void __itoa(int val, char* buffer, char base);
 
 static int format_string(const char* buf, const char *fmt, va_list ap);
 
@@ -54,19 +54,17 @@ int sprintf(const char* buf, const char* fmt, ...)
   return format_string(buf, fmt, arg);
 }
 
-static void do_char(const char* buf, char c) __naked
+static void do_char(char c, const char* buf) __naked
 {
   __asm
 
-  ld hl,#4
-  add hl,sp
-  ld e,(hl)
+  ;A =  c
+  ;DE = *buf
 
-  dec hl
-  ld a,(hl)
-  dec hl
-  ld l,(hl)
-  ld h,a
+  ex de,hl
+  ld e,a
+
+  ld a,h
   or l
 
 #ifdef COM_FILE
@@ -74,16 +72,25 @@ static void do_char(const char* buf, char c) __naked
   jp z,5
 #else
   ld a,e
-  jp z,CHPUT
+  jr z,DO_CHPUT
 #endif
 
   ld (hl),e
   ret
 
+  ;CHPUT shouldnt modify IX and IY but on some buggy MSX models it does 
+DO_CHPUT:
+  push ix
+  push iy
+  call CHPUT
+  pop iy
+  pop ix
+  ret
+
   __endasm;
 }
 
-#define do_char_inc(c) {do_char(bufPnt,c); if(bufPnt) { bufPnt++; } count++;}
+#define do_char_inc(c) {do_char(c,bufPnt); if(bufPnt) { bufPnt++; } count++;}
 
 static int format_string(const char* buf, const char *fmt, va_list ap)
 {
@@ -165,20 +172,20 @@ static int format_string(const char* buf, const char *fmt, va_list ap)
       val = va_arg(ap, int);
 
     if(isUnsigned && isLong)
-      _ultoa(val, buffer, base);
+      __ultoa(val, buffer, base);
     else if(isUnsigned)
-      _uitoa(val, buffer, base);
+      __uitoa(val, buffer, base);
     else if(isLong)
-      _ltoa(val, buffer, base);
+      __ltoa(val, buffer, base);
     else
-      _itoa(val, buffer, base);
+      __itoa(val, buffer, base);
 #else
     val = va_arg(ap, int);
     
     if(isUnsigned)
-      _uitoa(val, buffer, base);
+      __uitoa(val, buffer, base);
     else
-      _itoa(val, buffer, base);
+      __itoa(val, buffer, base);
 #endif
 
     strPnt = buffer;

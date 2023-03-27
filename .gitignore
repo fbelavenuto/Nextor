@@ -13,6 +13,7 @@ bin/**
 *.hex
 *.HEX
 *.bin
+*.BIN
 *.ihx
 *.IHX
 *.lk
@@ -24,11 +25,11 @@ dos250ba.dat
 kernel.dat
 nextor2.rom
 info/*.pdf
+source/kernel/*.bytes
 source/kernel/bank*/*.inc
 source/kernel/drivers/*.inc
 source/kernel/drivers/**/*.inc
 source/kernel/drivers/**/*.lst
-!source/kernel/drivers/MegaFlashRomSD/*.bin
 source/kernel/drivers/**/*.rom
 source/kernel/drivers/**/*.ROM
 source/kernel/bank5/*.dat
@@ -36,6 +37,7 @@ source/kernel/bank5/*.asm
 source/command/msxdos/*.inc
 source/command/msxdos/codes.mac
 source/command/msxdos/data.mac
+source/command/msxdos/USEKMSG.MAC
 source/tools/**.inc
 source/tools/**.asm
 source/tools/**.com
@@ -47,3 +49,6 @@ source/tools/data.mac
 *.suo
 NEXTOR.SYS
 NEXTORK.SYS
+nextor_base.dat
+*.LST
+

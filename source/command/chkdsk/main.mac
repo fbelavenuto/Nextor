@@ -352,8 +352,8 @@ scan_dir_entry:	push	hl			;Point IX at directory entry
 		cp	0E5h
 		jr	nz,not_deleted		;If entry is deleted then
 		xor	a			; remove the saved first
-		cp	(ix+DR_DCHAR)		; character so it can't be
-		ld	(ix+DR_DCHAR),a		; un-deleted and mark buffer
+		cp	(ix+DR_DELETED_FIRST_CHAR)		; character so it can't be
+		ld	(ix+DR_DELETED_FIRST_CHAR),a		; un-deleted and mark buffer
 		call	nz,DIRTY_BUFFER##	; as dirty if it was non-zero.
 		jr	scan_dir_next
 ;
@@ -364,7 +364,7 @@ scan_dir_entry:	push	hl			;Point IX at directory entry
 not_deleted:	call	FLST_NEW##		;Create a new record for this
 		call	ENT_DEBUG##		; entry in the file list.
 ;
-		ld	a,(ix+DR_ATTR)		;Test volume-name bit and
+		ld	a,(ix+DR_ATTRIBUTES)		;Test volume-name bit and
 		bit	AT_VOL,a		; skip if not set.
 		jr	z,not_vol_name
 ;
@@ -389,7 +389,7 @@ kill_vol_name:	call	QER_MSG##		;Give error message
 ;
 not_vol_name:	call	CHECK_CHAIN		;Check that chain is valid
 		ex	af,af'                  ;Save file size check flag
-		bit	AT_DIR,(ix+DR_ATTR)	;If entry is a file then skip
+		bit	AT_DIR,(ix+DR_ATTRIBUTES)	;If entry is a file then skip
 		jr	z,not_sub_dir		; to file size checking.
 ;
 		call	DRE_SV##		;Setup for sub-dir search
@@ -401,7 +401,7 @@ not_vol_name:	call	CHECK_CHAIN		;Check that chain is valid
 		call	DRE_SAME##		; back to its parent.
 		ld	a,__CVD_MSG##		;Print out an error message.
 		call	QER_MSG##
-		ld	(ix+DR_ATTR),ATM_ARC	;Convert the directory into
+		ld	(ix+DR_ATTRIBUTES),ATM_ARC	;Convert the directory into
 		call	DIRTY_BUFFER##		; a file, both in the sector
 		ld	hl,(FILE_PTR##)		; buffer and in the file
 		ld	(hl),ATM_ARC		; list record.
@@ -440,8 +440,8 @@ CHECK_CHAIN:
 		ld	bc,0			;Start cluster count
 		exx				; at zero.
 ;
-		ld	e,(ix+DR_CLU)		;Get first cluster from
-		ld	d,(ix+DR_CLU+1)		; directory entry and if
+		ld	e,(ix+DR_FIRST_CLUSTER)		;Get first cluster from
+		ld	d,(ix+DR_FIRST_CLUSTER+1)		; directory entry and if
 		ld	a,d			; it is zero then return
 		or	e			; immediately with BC=0
 		jr	z,chain_done_z		; to indicate null chain.
@@ -481,8 +481,8 @@ invalid_first:	ld	hl,(FILE_PTR##)		;First cluster number is
 		ld	(hl),0			; number both in the file
 		inc	hl			; list record and also in the
 		ld	(hl),0			; directory entry itself.
-		ld	(ix+DR_CLU),0
-		ld	(ix+DR_CLU+1),0		;Flag sector as dirty to
+		ld	(ix+DR_FIRST_CLUSTER),0
+		ld	(ix+DR_FIRST_CLUSTER+1),0		;Flag sector as dirty to
 		call	DIRTY_BUFFER##		; ensure it gets written out
 		ld	a,__IENT_MSG##
 		call	QER_MSG##		;Print an error message.
@@ -508,7 +508,7 @@ endif
 chain_done_z:	xor	a			;Allow file size check.
 chain_done:	push	af			;Save file size check flag
 		exx
-		ld	a,(ix+DR_ATTR)
+		ld	a,(ix+DR_ATTRIBUTES)
 		ld	hl,DIR_COUNT##		;Point HL at correct count
 		bit	AT_DIR,a		; variable for this directory
 		jr	nz,got_count_addr	; entry.  There are seperate
@@ -662,7 +662,7 @@ dot_fail_nz_1:	pop	bc			; failure.
 		ld	bc,0			; this is what should be in
 not_root_clu:					; the entry.
 ;
-		ld	de,DR_CLU-DR_ATTR	;Get cluster number from
+		ld	de,DR_FIRST_CLUSTER-DR_ATTRIBUTES	;Get cluster number from
 		add	hl,de			; directory entry and compare
 		ld	e,(hl)			; it with the one passed in BC.
 		inc	hl

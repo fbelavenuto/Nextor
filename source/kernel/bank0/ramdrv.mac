@@ -1,10 +1,11 @@
 	.z80
+	name('ramdrv')
 	title	MSX-DOS 2 ROM	Copyright (1986)  IS Systems Ltd.
 	subttl	RAM disk driver
 ;-----------------------------------------------------------------------------
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 ;
 SLOT_REG	equ	0A8h
 ;
@@ -19,12 +20,12 @@ R_SECLEN	equ	512			;Sector size is always 512.
 R_DSKCHG::
 ;
 ;    This is the "media check" function.  It always returns "not changed"  if
-; the  "UPB_VOLID" byte of the boot sector is "V", otherwise it returns "disk
+; the  "UPB_VOLUME_ID" byte of the boot sector is "V", otherwise it returns "disk
 ; changed" as this will force a "BUILD_UPB" function call and the  next  read
 ; will re-build the UPB in the boot sector.
 ;
 ;
-		ld	hl,RD_BOOT##+UPB_VOLID##
+		ld	hl,RD_BOOT##+UPB_VOLUME_ID##
 		ld	a,(DATA_SEG##)
 		call	RD_SEG##
 		cp	"V"
@@ -80,7 +81,7 @@ R_DSKIO::
 		ld	(RD_SCNT##),a		;Save sector count.
 ;
 		ex	af,af'			;Read write flag -> carry'
-		ld	hl,RD_BOOT##+UPB_VOLID##
+		ld	hl,RD_BOOT##+UPB_VOLUME_ID##
 		ld	a,(DATA_SEG##)
 		call	RD_SEG##		;If no UPB currently exists
 		ei
@@ -324,7 +325,7 @@ MAKE_UPB:
 		ret
 ;
 make_upb_ok:	exx
-		ld	hl,RD_BOOT##+UPB_SSZ##
+		ld	hl,RD_BOOT##+UPB_SECTOR_SIZE##
 		ld	(hl),low 512
 		inc	hl			;Sector size is 512 bytes
 		ld	(hl),high 512
@@ -415,7 +416,7 @@ fit_12bit_2:
 		inc	hl
 ;
 		ld	hl,RAMDISK_VOLID		;Copy the fixed volume
-		ld	de,RD_BOOT##+UPB_VOLID##	; id and dirt disk flag
+		ld	de,RD_BOOT##+UPB_VOLUME_ID##	; id and dirt disk flag
 		ld	bc,RAMDISK_VEND-RAMDISK_VOLID	; from below into the
 		ldir					; boot sector.
 ;

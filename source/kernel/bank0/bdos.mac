@@ -1,10 +1,11 @@
 	.z80
+	name('bdos')
 	title	MSX-DOS 2 ROM   Copyright (1986)  IS Systems Ltd.
 	subttl	MSX Environment Setup and BDOS Entry Code
 ;*****************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 ;
 ;-----------------------------------------------------------------------------
 ;
@@ -141,7 +142,7 @@ TIME_IRQ::
 		ld	(CH_COUNT##),a		; leave it unaltered.
 ;
 		ld	a,(TIM_TICK##)		;If deferred UD timeout ticks
-		cp	UD_TMOUT##		; is less than UD_TMOUT
+		cp	UD_MEDIA_CHECK_TIMEOUT##		; is less than UD_MEDIA_CHECK_TIMEOUT
 		adc	a,0			; then increment it, else
 		ld	(TIM_TICK##),a		; leave it unaltered.
 ;

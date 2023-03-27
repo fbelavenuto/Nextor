@@ -1,4 +1,5 @@
     .z80
+    name('dskab')
 
     INCLUDE	MACROS.INC
 	INCLUDE	CONST.INC

@@ -1,4 +1,5 @@
 	.z80
+	name('chgbnk')
 	title	CHGBNK - OEM Supplied Bank Switching Module
 ;
 ;-----------------------------------------------------------------------
@@ -29,7 +30,7 @@ BNKID	equ	40FFh		;Where Bank ID is stored
 ;bank bit 1 -> register bit 6
 ;bank bit 2 -> register bit 5
 
-CHGBNK::
+CHGBNK:
 
 	ld	(BNKREG),a
 	ret

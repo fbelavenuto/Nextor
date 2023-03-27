@@ -5,9 +5,9 @@
 
 	;output	"sunride_aquijacks.bin"
 	
-	org		$4000
+	org		4000h
 
-	ds		256, $FF		; 256 dummy bytes
+	ds		256, 0FFh		; 256 dummy bytes
 
 
 DRV_START:

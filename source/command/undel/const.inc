@@ -85,17 +85,17 @@ CF_TE	EQU	4	;Set => filename terminator character
 ;		====================
 ;
 FIB_FILNAME	EQU	1	;ASCII version of filename.
-FIB_ATTR	EQU	14	;Attributes byte.
-FIB_TIME	EQU	15
-FIB_DATE	EQU	17
-FIB_CLUSTER	EQU	19	;Start cluster.
-FIB_SIZE	EQU	21	;File size.
+FIB_ATTRIBUTES	EQU	14	;Attributes byte.
+FIB_MODIFIED_TIME	EQU	15
+FIB_MODIFIED_DATE	EQU	17
+FIB_START_CLUSTER	EQU	19	;Start cluster.
+FIB_FILE_SIZE	EQU	21	;File size.
 FIB_DRIVE	EQU	25	;Drive number.
 FIB_VOL_ID	EQU	26	;Volume ID.
 FIB_DEV		EQU	30	;Device number.
-FIB_SA		EQU	31	;Search attributes.
-FIB_PAT		EQU	32	;Extended pattern filename (FCB form).
-FIB_DVAR	EQU	43	;Directory variables.
+FIB_SEARCH_ATTRIBUTES		EQU	31	;Search attributes.
+FIB_EXPANDED_SEARCH_PATTERN		EQU	32	;Extended pattern filename (FCB form).
+FIB_DIRECTORY_VARIABLES	EQU	43	;Directory variables.
 ;
 D_START		EQU	10	;Start of directory information.
 D_CLUSTER	EQU	8
@@ -113,11 +113,11 @@ D_ODD		EQU	0
 ;
 DR_FILE		equ	0		;Filename
 DR_EXT		equ	8		;Filename extension
-DR_ATTR		equ	11		;Attributes byte
-DR_DCHAR	equ	12		;Deleted filename character
-DR_TIME		equ	22		;Time of last update
+DR_ATTRIBUTES		equ	11		;Attributes byte
+DR_DELETED_FIRST_CHAR	equ	12		;Deleted filename character
+DR_UPDATED_TIME		equ	22		;Time of last update
 DR_DATE		equ	24		;Date of last update
-DR_CLU		equ	26		;Fisrt cluster number
+DR_FIRST_CLUSTER		equ	26		;Fisrt cluster number
 DR_SIZE		equ	28		;File size
 ;
 ;

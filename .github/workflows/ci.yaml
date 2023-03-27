@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - 'source/**'
+      - 'buildtools/**'
+      - '.github/workflows/**'
+  push:
+    paths:
+      - 'source/**'
+      - 'buildtools/**'
+      - '.github/workflows/**'
+    branches:
+      - 'v**'
+    tags:
+      - 'v**'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y binutils make curl cpm
+          
+          curl -Lo sdcc.tar.bz2 https://sourceforge.net/projects/sdcc/files/sdcc-linux-amd64/4.2.0/sdcc-4.2.0-amd64-unknown-linux2.5.tar.bz2/download
+          mkdir sdcc
+          cd sdcc
+          tar xjf ../sdcc.tar.bz2
+          sudo cp -r sdcc-4.2.0/* /usr/local/
+          sdcc -v
+      - name: Install Nestor80
+        env:
+          N80_VERSION: '1.1'
+          LK80_VERSION: '1.0'
+          LB80_VERSION: '1.0'
+        run: |
+          curl -Lo n80.zip https://github.com/Konamiman/Nestor80/releases/download/n80-v${N80_VERSION}/N80_${N80_VERSION}_SelfContained_linux-x64.zip
+          unzip n80.zip
+          sudo install -v N80 /usr/local/bin
+          rm N80
+          rm n80.zip
+
+          curl -Lo lk80.zip https://github.com/Konamiman/Nestor80/releases/download/lk80-v1.0/LK80_1.0_SelfContained_linux-x64.zip
+          unzip lk80.zip
+          sudo install -v LK80 /usr/local/bin
+          rm LK80
+          rm lk80.zip
+
+          curl -Lo lb80.zip https://github.com/Konamiman/Nestor80/releases/download/lb80-v${LB80_VERSION}/LB80_${LB80_VERSION}_SelfContained_linux-x64.zip
+          unzip lb80.zip
+          sudo install -v LB80 /usr/local/bin
+          rm LB80
+          rm lb80.zip
+      - name: Add buildtools
+        run: |
+          for NAME in buildtools/linux/*; do
+            sudo install -v ${NAME} /usr/local/bin
+          done
+      - name: Make all
+        run: make -C source

@@ -168,13 +168,13 @@ not_null_fname:
 		pop	bc
 		jr	nz,first_err		;Skip if any error.
 ;
-		BIT	AT_DEV,(IX+FIB_ATTR)	;Check if it is actually a
+		BIT	AT_DEV,(IX+FIB_ATTRIBUTES)	;Check if it is actually a
 		LD	A,.NOFIL##		; device, and give error if so.
 		JP	NZ,EXIT
 ;
 		bit	PF_AMB,b
 		jr	nz,first_ok		;Jump if search was ambiguous
-		BIT	AT_DIR,(IX+FIB_ATTR)	;What have we found ??
+		BIT	AT_DIR,(IX+FIB_ATTRIBUTES)	;What have we found ??
 		jr	z,first_ok		;Jump if not a sub-directory
 ;
 		LD	HL,FIB##		;Pretend FIB is the path.
@@ -541,7 +541,7 @@ SCAN_DIR:
 		ld	hl,(FILE_LIST##)	;Initialise file list to
 		ld	(hl),0			; be empty.
 ;
-		ld	hl,(FIB##+FIB_DVAR+D_START)
+		ld	hl,(FIB##+FIB_DIRECTORY_VARIABLES+D_START)
 						;Initialise a search of the
 		ld	(DIR_START##),hl	; required directory.
 ;
@@ -583,7 +583,7 @@ CHECK_ENTRY:
 ; follows:  1.   Must  be a deleted entry (first byte 0E5h). 2.  Must not be a
 ; volume name or sub-directory entry.  3.   The  name  must  not  contain  any
 ; invalid  filename  characters  after  the  first  chracater is restored from
-; DR_DCHAR. 4.  The cluster number field must contain a valid cluster  number.
+; DR_DELETED_FIRST_CHAR. 4.  The cluster number field must contain a valid cluster  number.
 ; 5.  The cluster referred to must be the start of an "undeletable" file chain
 ;
 ;    If  all  of  these points are satisfied then the entry is a candidate for
@@ -619,7 +619,7 @@ uncase_loop:	ld	a,(hl)
 		djnz	uncase_loop
 ;
 		ld	de,ENT_BUF##		;Compare the filename in the
-		ld	hl,FIB+FIB_PAT		; entry with the one we
+		ld	hl,FIB+FIB_EXPANDED_SEARCH_PATTERN		; entry with the one we
 		call	CMP_FNAME##		; are looking for and return
 		ret	nz			; if no match.
 ;
@@ -681,7 +681,7 @@ NAME_CHK:
 ; any candidate files in the list which exactly match the name from disk.
 ;
 ;
-		ld	hl,(FIB##+FIB_DVAR+D_START)
+		ld	hl,(FIB##+FIB_DIRECTORY_VARIABLES+D_START)
 		ld	(DIR_START##),hl	;Initialise a search of the
 						; required directory.
 ;
@@ -775,7 +775,7 @@ clu_chk_loop:	ld	a,(hl)			;Look at next item in list and
 ;
 ;
 		push	hl
-		ld	de,1+DR_CLU		;Get the cluster number from
+		ld	de,1+DR_FIRST_CLUSTER		;Get the cluster number from
 		add	hl,de			; out of this item and store
 		ld	e,(hl)			; it at CC_CLUSTER so we can
 		inc	hl			; look for same cluster
@@ -809,7 +809,7 @@ cc_loop2:	ld	bc,1+32+SV_SIZE##	;Step onto next item in list
 		jr	z,cc_loop2_done
 ;
 		push	hl
-		ld	bc,1+DR_CLU		;Get the cluster number from
+		ld	bc,1+DR_FIRST_CLUSTER		;Get the cluster number from
 		add	hl,bc			; this item compare with
 		ld	c,(hl)			; the cluster number for this
 		inc	hl			; iteration of the main loop.
@@ -935,7 +935,7 @@ EXAMINE_ENTRY:
 ;
 		set	0,(hl)			;Flag item has been examined
 		push	hl			;Must preserve item pointer
-		ld	de,1+DR_ATTR
+		ld	de,1+DR_ATTRIBUTES
 		add	hl,de
 		bit	AT_DIR,(hl)		;Look at attributes and
 		jr	z,examine_file		; skip if it is a file.
@@ -950,7 +950,7 @@ EXAMINE_ENTRY:
 ;
 ;
 examine_file:	ld	(hl),ATM_ARC		;FILE - set default attributes
-		ld	de,DR_SIZE-DR_ATTR
+		ld	de,DR_SIZE-DR_ATTRIBUTES
 		add	hl,de
 		push	hl
 		ld	e,(hl)			;Get file size from the item
@@ -1052,7 +1052,7 @@ CHECK_DIR:
 		call	DRE_NEXT##		;Similarly check that the 2nd
 		jr	nz,invalid_dir		; entry is present & cluster
 		ld	de,dot_dot_name		; no. of main search dir.
-		ld	bc,(FIB##+FIB_DVAR+D_START)
+		ld	bc,(FIB##+FIB_DIRECTORY_VARIABLES+D_START)
 		call	CHECK_DOT_DIR
 		jr	nz,invalid_dir		;Reject if not.
 ;
@@ -1112,7 +1112,7 @@ dot_fail_nz_1:	pop	bc			; failure.
 		ld	bc,0			; this is what is in entry.
 not_root_clu:
 ;
-		ld	de,DR_CLU-DR_ATTR	;Get cluster number from
+		ld	de,DR_FIRST_CLUSTER-DR_ATTRIBUTES	;Get cluster number from
 		add	hl,de			; directory entry and compare
 		ld	e,(hl)			; it with the one passed in BC.
 		inc	hl
@@ -1215,7 +1215,7 @@ dont_rename:	ex	de,hl
 ;
 		pop	hl
 		push	hl			;Get start cluster number
-		ld	bc,1+DR_CLU		; from the item.
+		ld	bc,1+DR_FIRST_CLUSTER		; from the item.
 		add	hl,bc
 		ld	e,(hl)
 		inc	hl
@@ -1280,7 +1280,7 @@ undel_inc_loop:	inc	(hl)			; in the undelete filename
 		dec	hl
 		jr	undel_inc_loop
 ;
-rename_check:	ld	hl,(FIB##+FIB_DVAR+D_START)
+rename_check:	ld	hl,(FIB##+FIB_DIRECTORY_VARIABLES+D_START)
 		ld	(DIR_START##),hl	;Initialise a search of the
 						; directory.
 ;

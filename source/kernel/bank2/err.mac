@@ -1,10 +1,11 @@
 	.z80
+	name('err')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Error handling
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -38,7 +39,7 @@
 ; Preserves:  BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:   AF
 ;
-; Assumes:     UD_TIME=UD_PHYS+1
+; Assumes:     UD_TIME=UD_PHYSICAL_UNIT+1
 ;
 ;
 		push	bc
@@ -79,7 +80,7 @@ sector_invalid:
         push ix
         push hl
         pop ix
-        ld b,(ix+UD_PHYS##)
+        ld b,(ix+UD_PHYSICAL_UNIT##)
         bit UF_DBD,(ix+UD_DFLAGS##)
         jr nz,err_no_upb
         ld a,(ix+UD_TIME##) ;If UD_TIME is non-zero (UPB is defined) then set it to

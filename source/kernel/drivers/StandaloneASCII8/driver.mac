@@ -10,8 +10,8 @@
 
 ;-----------------------------------------------------------------------------
 
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../../macros.inc
+	INCLUDE	../../const.inc
 ;
 	; Routines available on kernel page 0
 
@@ -75,6 +75,8 @@ single_double	equ	7420h
 	;- Bank switching code must be available at 7FD0h
 	;  (must be available in all banks actually).
 
+
+	org 4100h
 
 	;***************************
 	;***  DUMMY DRIVER CODE  ***

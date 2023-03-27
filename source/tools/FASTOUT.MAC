@@ -73,7 +73,7 @@ DO_INFO:
 	jp	5
 
 INFO_MSG:
-	"Fast STROUT mode is currently ",0
+	db	"Fast STROUT mode is currently ",0
 ON_S:	db	"ON",13,10,0
 OFF_S:	db	"OFF",13,10,0
 

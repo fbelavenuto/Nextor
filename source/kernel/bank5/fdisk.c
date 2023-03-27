@@ -1591,9 +1591,19 @@ void InitializeWorkingScreen(char* header)
 void PrintRuler()
 {
 	int i;
+	byte width;
+	
+	// "Hack" for korean MSX computers that do weird things
+	// when printing a character at the last column of the screen
+	if(*((byte*)H_CHPH) != 0xC9) {
+		width = currentScreenConfig.screenWidth - 1;
+	}
+	else {
+		width = currentScreenConfig.screenWidth;
+	}
 
 	HomeCursor();
-	for(i = 0; i < currentScreenConfig.screenWidth; i++) {
+	for(i = 0; i < width; i++) {
 		chput('-');
 	}
 }
@@ -1635,13 +1645,9 @@ void PrintStateMessage(char* string)
 void chput(char ch) __naked
 {
     __asm
-    push    ix
-    ld      ix,#4
-    add     ix,sp
-    ld  a,(ix)
-    call CHPUT
-    pop ix
-    ret
+	;A = ch
+
+	jp CHPUT
     __endasm;
 }
 
@@ -1649,11 +1655,9 @@ void chput(char ch) __naked
 void print(char* string) __naked
 {
 	 __asm
-    push    ix
-    ld      ix,#4
-    add     ix,sp
-    ld  l,(ix)
-	ld	h,1(ix)
+
+	 ;HL = string
+	 
 PRLOOP:
 	ld	a,(hl)
 	or	a
@@ -1662,7 +1666,6 @@ PRLOOP:
 	inc	hl
 	jr	PRLOOP
 PREND:
-    pop ix
     ret
     __endasm;
 }

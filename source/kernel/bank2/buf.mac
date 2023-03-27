@@ -1,10 +1,11 @@
 	.z80
+	name('buf')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Sector Buffer Handling
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -12,7 +13,7 @@
 ;   This routine gets a given sector from a given unit number into  a  buffer.
 ; It  has  two  entry  points, one for normal sectors and one for FAT sectors.
 ; The FAT sector entry point ("BF_FAT_SECTOR") sets up the number of copies to
-; read  to  UD_NFAT  if  the disk is clean and UD_NFAT-1 if the disk is dirty.
+; read  to  UD_NUMBER_OF_FATS  if  the disk is clean and UD_NUMBER_OF_FATS-1 if the disk is dirty.
 ; The normal sector entry point ("BF_SECTOR") always sets the number of copies
 ; to one.
 ;
@@ -40,16 +41,17 @@
 ; Preserves:   DE,IX,AF',BC',DE',HL'
 ; Corrupts:    AF,BC,HL
 ;
-; Assumes:     BD_LINK=0    BD_UNIT=2    BD_FLAGS=3    BD_SECT=4
-;	       BD_COPY=6    BD_SEP=7     BD_UD=9       BD_DATA=11
-;              BD_EX_SECT=8
+; Assumes:     BD_NEXT_DESC_ADDRESS=0    BD_PHYSICAL_UNIT_NUMBER=2    BD_FLAGS=3    BD_SECTOR_NUMBER=4
+;	       BD_NUMBER_OF_COPIES=6    BD_SECTORS_BETWEEN_COPIES=7     BD_UNIT_DESCRIPTOR_ADDRESS=9       BD_DATA=11
+;              BD_EX_SECTOR_NUMBER=8
 ;
 ;
 	PROC	BF_FAT_SECTOR
 ;
 		ld	bc,0100h		;B = Flag read required & no ignore / C = 0 (sector number (bit16-22))
-		ld	a,(ix+UD_NFAT##)	;If disk is clean then set
-		bit	0,(ix+UD_DIRT##)	; number of copies to UD_NFAT
+;;		ld	b,1
+		ld	a,(ix+UD_NUMBER_OF_FATS##)	;If disk is clean then set
+		bit	0,(ix+UD_DIRTY_DISK_FLAG##)	; number of copies to UD_NUMBER_OF_FATS
 		jr	z,bf_a_copies		; (all copies of the FAT).
 		dec	a			;If dirty disk, read one less
 		jr	nz,bf_a_copies		; copy, unless there is only
@@ -70,14 +72,14 @@ bf_a_copies:	ld	(READ_COPIES##),a	;Remember number of copies
 		ld	a,h
 		sub	1			;If cache<>0 then test if it
 		ld	a,c			;A := sector number (bit16-22)
-		ld	c,(ix+UD_PHYS##)	;C := physical unit number
+		ld	c,(ix+UD_PHYSICAL_UNIT##)	;C := physical unit number
 		call	nc,BF_CMP		; contains the correct unit and
 		ret	z			; sector, and return if so.
 ;
 		ld	hl,(B_CHAIN##)		;Point at start of chain and
 		push	hl			; save this address in case
 						; sector not found.
-bf_sector_loop:	ld	c,(ix+UD_PHYS##)	;C := physical unit number
+bf_sector_loop:	ld	c,(ix+UD_PHYSICAL_UNIT##)	;C := physical unit number
 		call	BF_CMP			;See if this buffer has the
 		jp	z,already_in_buf	; right sector and jump if so
 		ld	c,a			;preserve A
@@ -95,8 +97,6 @@ bf_sector_loop:	ld	c,(ix+UD_PHYS##)	;C := physical unit number
 ;
 		pop	hl			;HL -> first buffer on chain
 
-		call ADJ_BUF_NUM
-
 		inc	hl
 		inc	hl
 		bit	7,(hl)			;Look at unit number and
@@ -112,7 +112,7 @@ first_buf_ok:
 ;
 		inc	hl
 		inc	hl
-		ld	a,(ix+UD_PHYS##)	;Record physical unit number
+		ld	a,(ix+UD_PHYSICAL_UNIT##)	;Record physical unit number
 		ld	(hl),a
 		inc	hl
 ;
@@ -130,7 +130,7 @@ first_buf_ok:
 		ld	(hl),a			; the buffer descriptor
 		inc	hl
 ;
-		ld	a,(ix+UD_SFAT##)	;Record copy separation in
+		ld	a,(ix+UD_SECTORS_PER_FAT##)	;Record copy separation in
 		ld	(hl),a			; buffer descriptor.  This is
 		inc	hl			; just the number of sectors
 						; per FAT.
@@ -185,7 +185,7 @@ bf_multi_read:	push	de			;Save registers which are
 		ld	b,1			;B:=Sector count
 		ld	a,RD_CMD##		;Get READ command code
 
-		call	DO_RW			;Try to read the sector
+		pcall	RW_UNIT			;Try to read the sector
 
 		pop	bc			;Get copy count & separation
 		pop	de			;Get sector number back
@@ -218,9 +218,7 @@ already_in_buf:	pop	bc			 ;Clean up stack
 		set	FF_DBUF,(iy+@FAT_FLAGS##);Directory buffer not cached
 		ld	(B_CACHE##),hl		 ;Record buffer as cache
 
-		ld	a,(BF_LEVEL##)
-		or	a
-		call	z,BF_END	;Put buffer on end of chain		 
+		call	BF_END	;Put buffer on end of chain		 
 ;
 		xor	a
 		ret				;Return Z-set (for DIRTY_DISK)
@@ -241,7 +239,7 @@ BF_CMP:
 ; Preserves:  A,BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:   F :FAT16
 ;
-; Assumes:    BD_UNIT=2   BD_SECT=4   BD_EX_SECT=8 :FAT16
+; Assumes:    BD_PHYSICAL_UNIT_NUMBER=2   BD_SECTOR_NUMBER=4   BD_EX_SECTOR_NUMBER=8 :FAT16
 ;
 ;
 		push	hl
@@ -357,7 +355,7 @@ flush_loop:	call	FLG_NEXT		;Find next buffer and return
 ; Preserves:  BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:   AF
 ;
-; Assumes:    BD_UNIT=2
+; Assumes:    BD_PHYSICAL_UNIT_NUMBER=2
 ;
 ;
 		call	FLG_BUFS		;Flag appropriate buffers
@@ -381,7 +379,7 @@ FLG_BUFS:	jr	c,FLG_PHYS		;Skip if drive in A
 ;
 		push	hl
 		push	bc			;Get physical drive number
-		ld	bc,UD_PHYS##		; from unit descriptor.
+		ld	bc,UD_PHYSICAL_UNIT##		; from unit descriptor.
 		add	hl,bc
 		ld	a,(hl)
 		pop	bc
@@ -404,7 +402,7 @@ FLG_PHYS:
 ; Preserves:  BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:   AF
 ;
-; Assumes:    BD_LINK=0      BD_UNIT=2      BD_FLAGS=3
+; Assumes:    BD_NEXT_DESC_ADDRESS=0      BD_PHYSICAL_UNIT_NUMBER=2      BD_FLAGS=3
 ;
 ;
 		push	hl
@@ -457,7 +455,7 @@ POP_UD_RET:	pop	hl			;Also used as return from the
 ; Preserves:    BC,DE,IX,AF',BC',DE',HL'
 ; Corrupts:     AF,HL
 ;
-; Assumes:      BD_LINK=0     BD_FLAGS=3
+; Assumes:      BD_NEXT_DESC_ADDRESS=0     BD_FLAGS=3
 ;
 ;
 		ld	hl,(B_CHAIN##)		;HL -> start of buffer chain
@@ -496,7 +494,7 @@ find_flag_loop:	push	hl
 ; Preserves:  A,BC,DE,HL,IX,AF',BC',DE',HL' : FAT16
 ; Corrupts:   F : FAT16
 ;
-; Assumes:    BD_LINK=0
+; Assumes:    BD_NEXT_DESC_ADDRESS=0
 ;
 ;
 		push	de			;Preserve DE
@@ -518,7 +516,7 @@ find_flag_loop:	push	hl
 		ld	b,(hl)			; this one and save for later
 		push	bc
 		ld	(hl),d			;Put address of buffer which
-		dec	hl			; used to be first in BD_LINK
+		dec	hl			; used to be first in BD_NEXT_DESC_ADDRESS
 		ld	(hl),e			; pointer for this buffer so it
 						; will end up second.
 ;
@@ -548,12 +546,12 @@ BF_END:
 ; Preserves:  BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:   AF
 ;
-; Assumes:    BD_LINK=0
+; Assumes:    BD_NEXT_DESC_ADDRESS=0
 ;
 ;
 		ld	a,(hl)
 		inc	hl		;If buffer is already last one
-		or	(hl)		; (BD_LINK=0) then return
+		or	(hl)		; (BD_NEXT_DESC_ADDRESS=0) then return
 		dec	hl		; immediately.
 		ret	z
 ;
@@ -578,7 +576,7 @@ BF_END:
 					; DE->buffer before it.  HL=(DE)=BC
 ;
 		ex	de,hl
-		pop	de		;Set BD_LINK pointer in buffer which
+		pop	de		;Set BD_NEXT_DESC_ADDRESS pointer in buffer which
 		ld	(hl),e		; was before this one, to point to
 		inc	hl		; the buffer which was after this one,
 		ld	(hl),d		; thus removing this buffer from chain.
@@ -615,10 +613,10 @@ BF_FIND:
 ; Preserves:  BC,IX,AF',BC',DE',HL'
 ; Corrupts:   DE,HL,AF
 ;
-; Assumes:    BD_LINK=0
+; Assumes:    BD_NEXT_DESC_ADDRESS=0
 ;
 ;
-bf_find_loop:	ld	e,(hl)		;Get next buffer address (BD_LINK)
+bf_find_loop:	ld	e,(hl)		;Get next buffer address (BD_NEXT_DESC_ADDRESS)
 		inc	hl		; from this buffer.
 		ld	d,(hl)
 		dec	hl
@@ -642,14 +640,14 @@ bf_find_loop:	ld	e,(hl)		;Get next buffer address (BD_LINK)
 ;   This  routine makes sure that a given buffer is empty.  If it is not empty
 ; then the contents will be flushed if it is dirty,  and  it  will  be  marked
 ; empty.   When  the  contents are flushed, multiple copies will be written if
-; required by the BD_COPY field of the buffer descriptor.  However if bit-6 of
+; required by the BD_NUMBER_OF_COPIES field of the buffer descriptor.  However if bit-6 of
 ; the  buffer  flags  is  set then the buffer will only be written to the last
 ; copy of the FAT.  This facility is only used in "CLEAN_DISK".
 ;
 ;    This routine always sets the  flag  "FF_DBUF"  in  "FAT_FLAGS"  to  force
 ; "DIRE_NEXT"  to  check that its sector is still buffered, since this routine
 ; could use that buffer for something else.  Note  that  the  buffer  will  be
-; marked  as  non-dirty  but  will  NOT  be  marked as invalid (BD_UNIT is not
+; marked  as  non-dirty  but  will  NOT  be  marked as invalid (BD_PHYSICAL_UNIT_NUMBER is not
 ; changed).
 ;
 ; Entry:       HL = Address of buffer to flush
@@ -657,13 +655,11 @@ bf_find_loop:	ld	e,(hl)		;Get next buffer address (BD_LINK)
 ; Preserves:   BC,DE,HL,IX,AF',BC',DE',HL'
 ; Corrupts:    AF
 ;
-; Assumes:     BD_UNIT=2   BD_FLAGS=3   BD_SECT=4
-;	       BD_COPY=6   BD_UD=9      BD_DATA=11
-;              BD_EX_SECT=8
+; Assumes:     BD_PHYSICAL_UNIT_NUMBER=2   BD_FLAGS=3   BD_SECTOR_NUMBER=4
+;	       BD_NUMBER_OF_COPIES=6   BD_UNIT_DESCRIPTOR_ADDRESS=9      BD_DATA=11
+;              BD_EX_SECTOR_NUMBER=8
 ;
 ;
-		call ADJ_BUF_NUM
-
 		set	FF_DBUF,(iy+@FAT_FLAGS##) ;Set directory buffer flag
 ;
 		push	hl		;Save buffer pointer
@@ -689,17 +685,17 @@ flush_retry:	push	hl
 		inc	hl		;      descriptor
 		ld	d,(hl)
 		inc	hl
-		ld	b,(hl)		;B := BD_COPY from buffer descriptor
+		ld	b,(hl)		;B := BD_NUMBER_OF_COPIES from buffer descriptor
 		inc	hl
 ;
 		jr	z,not_last_fat	 ;If the "last FAT only" flag is set
 		ld	a,e		 ; then adjust the sector number by
-last_fat_loop:	inc	(hl)		 ; adding BD_COPY*BD_SEP on to it.
+last_fat_loop:	inc	(hl)		 ; adding BD_NUMBER_OF_COPIES*BD_SECTORS_BETWEEN_COPIES on to it.
 		dec	(hl)
-		jr	z,no_lfat_8bit	 ;force incriment D if BD_SEP = 0(UPB_SFAT = 256)
+		jr	z,no_lfat_8bit	 ;force incriment D if BD_SECTORS_BETWEEN_COPIES = 0(UPB_SECTORS_PER_FAT = 256)
 		add	a,(hl)
 		jr	nc,no_lfat_carry ;This is used by clean disk and
-no_lfat_8bit:	inc	d		 ; BD_COPY must be UD_NFAT-1 so that
+no_lfat_8bit:	inc	d		 ; BD_NUMBER_OF_COPIES must be UD_NUMBER_OF_FATS-1 so that
 no_lfat_carry:	djnz	last_fat_loop	 ; this points to the last copy of
 		ld	e,a		 ; the FAT sector.
 		ld	b,1		 ;Only write out one copy.
@@ -711,7 +707,7 @@ not_last_fat:
 		ld	(DIO_EX_SECTOR##),a
 		inc	hl
 		ld	e,(hl)		;DE := address of unit descriptor
-		inc	hl		;      from BD_UD field of buffer
+		inc	hl		;      from BD_UNIT_DESCRIPTOR_ADDRESS field of buffer
 		ld	d,(hl)		;      descriptor.
 		inc	hl
 		ex	de,hl		;HL := unit descriptor address
@@ -729,7 +725,7 @@ bf_flush_loop:	push	de		;Save registers which are
 		ld	bc,(DATA_SEG##)	;C:=data segment
 		ld	b,1		;B:=Sector count
 		ld	a,WR_CMD##	;A:=write command code
-		call	DO_RW		;Call the unit handler
+		pcall	RW_UNIT		;Call the unit handler
 		pop	bc
 		pop	de		;Restore parameters
 ;
@@ -743,9 +739,9 @@ flush_err:				; done OK.
 not_noupb_err:				 ; by DISK_ERR.
 ;
 		push	af
-		ld	a,(ix+BD_SEP##-BD_DATA##);DE+:=BD_SEP, i.e. adjust
+		ld	a,(ix+BD_SECTORS_BETWEEN_COPIES##-BD_DATA##);DE+:=BD_SECTORS_BETWEEN_COPIES, i.e. adjust
 		or	a			 ; sector number for next
-		jr	z,flush_no_8bit		 ; copy of data to write.	;force incriment D if BD_SEP = 0 (UPB_SFAT = 256)
+		jr	z,flush_no_8bit		 ; copy of data to write.	;force incriment D if BD_SECTORS_BETWEEN_COPIES = 0 (UPB_SECTORS_PER_FAT = 256)
 		add	a,e
 		ld	e,a
 		jr	nc,flush_no_cy
@@ -780,57 +776,6 @@ pop_hl_ret:	pop	hl		;Restore buffer pointer
 ;
 ;------------------------------------------------------------------------------
 ;
-		;Read or write unit with adjustment of BF_LEVEL.
-		;
-		;If a file is mounted, the call to RW_UNIT por pre-read/write
-		;will cause the BF_FLUSH or BF_SECTOR routine to re-enter.
-		;We use the BF_LEVEL variable to keep track of when that happens
-		;and act accordingly (see ADJ_BUF_NUM below).
-		;
-		;Input, output, modifies: same as RW_UNIT.
-DO_RW:
-		push	af
-		ld	a,(BF_LEVEL##)
-		inc	a
-		ld	(BF_LEVEL##),a	;To support re-enter check
-		pop	af
-
-		pcall	RW_UNIT			;Try to read the sector
-
-		push	af
-		ld	a,(BF_LEVEL##)
-		dec	a
-		ld	(BF_LEVEL##),a
-		pop	af
-
-		ret
-
-
-		;Adjust sector buffer pointer if necessary.
-		;
-		;If a file is mounted, the call to RW_UNIT por pre-read/write
-		;will cause the BF_FLUSH or BF_SECTOR routine to re-enter.
-		;In that case, the first buffer in the chain will end up having
-		;a wrong combination of unit+sector number and actual sector data.
-		;To prevent this, we check if we are re-entering,
-		;and in this case we use the second buffer in the chain
-		;instead of the first one.
-		;
-		;Input:  HL = Pointer to sector buffer.
-		;Output: HL = Pointer to same sector buffer, 
-		;             if case of routine re-entrance.
-		;Modifies: AF
-
-ADJ_BUF_NUM:
-		ld	a,(BF_LEVEL##)
-		or	a
-		ret	z
-		ld	a,(hl)
-		inc	hl
-		ld	h,(hl)
-		ld	l,a
-		ret
-
 	finish	<BUF>
 	end
 ;

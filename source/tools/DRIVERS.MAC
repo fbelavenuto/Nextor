@@ -187,9 +187,9 @@ DRVASSIGN_MSG:
 NUMDRIVES:
 	db	"0, from "
 FIRSTDRIVE:
-	"A: to "
+	db	"A: to "
 LASTDRIVE:
-	"Z:"
+	db	"Z:"
 CRLF:
 	db	13,10,0
 		

@@ -89,11 +89,11 @@ CF_TE   EQU     4       ;Set => filename terminator
 ;
 DR_FILE         equ     0               ;Filename
 DR_EXT          equ     8               ;Filename extension
-DR_ATTR         equ     11              ;Attributes byte
-DR_DCHAR        equ     12              ;Deleted filename character
-DR_TIME         equ     22              ;Time of last update
+DR_ATTRIBUTES         equ     11              ;Attributes byte
+DR_DELETED_FIRST_CHAR        equ     12              ;Deleted filename character
+DR_UPDATED_TIME         equ     22              ;Time of last update
 DR_DATE         equ     24              ;Date of last update
-DR_CLU          equ     26              ;Fisrt cluster number
+DR_FIRST_CLUSTER          equ     26              ;Fisrt cluster number
 DR_SIZE         equ     28              ;File size
 ;
 ;

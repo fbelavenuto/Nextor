@@ -1,11 +1,12 @@
 	.z80
+	name('mapinit')
 	title	MSX-DOS 2 ROM   Copyright (1986)  IS Systems Ltd.
 	subttl	Mapper Initialisation
 ;-----------------------------------------------------------------------------
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
-	INCLUDE	CONDASM.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
+	INCLUDE	../condasm.inc
 ;
 P0_REG		equ	0FCh
 P1_REG		equ	0FDh
@@ -198,14 +199,6 @@ zero_p2_loop:	ld	(hl),0			; data segment up to the
 		ld	(RAM_PTR##),hl		; to point to an end of chain
 						; marker at the bottom of all
 						; the fixed variables.
-		ld	hl,0
-		ld	(MHANDLES##),hl
-		ld	(MHANDLES##+2),hl
-		ld	(MHANDLES##+4),hl
-		ld	(MHANDLES##+6),hl
-		ld	a,h
-		ld	(RW_LEVEL##),a
-		ld	(BF_LEVEL##),a
 ;
 ;
 ;    *****  SETUP MAP_TBL AND SEGMENT LISTS IN PAGE-2  *****
@@ -635,6 +628,12 @@ MAPBIO::
 ;   For other values of D, the EXTBIO hook on the driver bank is called with D'=1.
 ;   This must return D'=1 if old hook must be called, D'=0 otherwise.
 
+		push de	;DE must always be preserved
+		call MAPBDO
+		pop de
+		ret
+
+MAPBDO:
 		exx
 		set	0,d
 		exx
@@ -704,14 +703,28 @@ EXB_NEX:
 ;
 	exx
 	ex	af,af'
-	ld	hl,EXB_RAM
+
 	ld	de,($SECBUF##)
+	push	de
+
+	ld	hl,EXB_RAM
 	ld	bc,EXB_RAM_END-EXB_RAM
 	ldir
+
+	ld	hl, +(EXB_SLOT_RESTORE+1)-EXB_RAM_END
+	add	hl, de
+	ex	de, hl
+
+	ld	hl, +(EXB_SLOT_BACKUP+1)-(EXB_SLOT_RESTORE+1)
+	add	hl, de
+	ld	(hl), e
+	inc	hl
+	ld	(hl), d
+
 	ex	af,af'
 	exx
-	ld	ix,($SECBUF##)
-	jp	(ix)
+
+	ret
 
 	;--- From here is copied to RAM
 EXB_RAM:
@@ -737,8 +750,28 @@ EXB_LOOP:
 	push	bc
 	push	de
 	push	hl
-    ld a,(ix)
+
+	ld	a,(ix)
+	ld	d,a
+	and	80h
+	jr	z,EXB_SLOT_BACKUP
+
+	ld	a,d
+	and	3
+	ld	e,a
+	ld	hl,SLTTBL
+	add	a,l
+	ld	l,a
+	ld	a,(hl)
+	and	0Ch
+	or	e
+	or	80h
+
+EXB_SLOT_BACKUP:
+	ld	(EXB_SLOT_RESTORE+1),a
+    ld a,d
     and 10001111b
+
    	ld	h,40h
 	call	ENASLT
 	ld	hl,DV_EXTBIO##
@@ -751,6 +784,28 @@ EXB_LOOP:
 	pop	bc
 	pop	af
 	call	CALDRV##
+
+	push	af
+
+EXB_SLOT_RESTORE:
+	ld	a,00h
+	or	a
+	jr	z,EXB_SKIP_RESTORE
+
+	push	bc
+	push	de
+	push	hl
+
+	ld	h,40h
+	call	ENASLT
+
+	pop	hl
+	pop	de
+	pop	bc
+
+EXB_SKIP_RESTORE:
+
+	pop	af
 
 	pop	iy
 	pop	ix

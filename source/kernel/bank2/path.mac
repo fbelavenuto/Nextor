@@ -1,10 +1,11 @@
 	.z80
+	name('path')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Pathname String Handling
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;-----------------------------------------------------------------------------
@@ -42,8 +43,8 @@
 ; Corrupts:   AF,BC,DE,HL,BC',DE',HL'
 ;
 ;
-		ld	(ix+FIB_FLG##),0FFh	;Make sure FIB is flagged
-		ld	(ix+FIB_SA##),b		;Record search attributes
+		ld	(ix+FIB_ID_BYTE##),0FFh	;Make sure FIB is flagged
+		ld	(ix+FIB_SEARCH_ATTRIBUTES##),b		;Record search attributes
 		ld	(iy+@PC_FLAGS##),c	;Store parse control flags.
 		ld	(STR_PTR##),de		;Initialise string pointer
 ;
@@ -60,9 +61,9 @@ given_default:	ld	d,a
 		bit	PC_NDRV,(iy+@PC_FLAGS##); then give an error if NDRV
 		ld	a,.IDRV##		; flag was set, otherwise use
 		ret	nz			; the specified drive.
-default_drive:	ld	(ix+FIB_DRV##),d
+default_drive:	ld	(ix+FIB_DRIVE_NUMBER##),d
 ;
-		bit	AT_VOL,(ix+FIB_SA##)	;If volume name flag is set
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	;If volume name flag is set
 		jr	nz,force_root		; then force root directory.
 ;
 		call	GET_CHAR		;If first character after drive
@@ -83,7 +84,7 @@ no_rootdir:	call	nz,UNGET_CHAR		;If not "\" then put char back
 		call	INIT_WPTH		;Initialise whole path string
 ;
 ;
-		bit	AT_VOL,(ix+FIB_SA##)	;If volume name flag was set
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	;If volume name flag was set
 		jr	z,item_loop		; then use separate parsing
 		ld	de,FNAME_BUF##		; routine and don't check for
 		call	PAR_VOL			; device names.
@@ -115,9 +116,9 @@ item_loop:	ld	de,FNAME_BUF##		;Parse next item out of string
 ;
 	PROC	PAR_FNM
 ;
-		ld	(ix+FIB_FLG##),0FFh	;Make sure FIB is flagged
-		ld	(ix+FIB_SA##),b		;Record search attributes
-		ld	(ix+FIB_DRV##),a	;Record logical drive number
+		ld	(ix+FIB_ID_BYTE##),0FFh	;Make sure FIB is flagged
+		ld	(ix+FIB_SEARCH_ATTRIBUTES##),b		;Record search attributes
+		ld	(ix+FIB_DRIVE_NUMBER##),a	;Record logical drive number
 		ld	(iy+@PC_FLAGS##),c	;Store parse control flags
 		ld	(STR_PTR##),de		;Initialise string pointer
 		ld	(STR2_PTR##),de		; and last item pointer.
@@ -476,7 +477,7 @@ NEXT_ITEM:
 ; located if the "PC_LAST" flag is set and if it is not a totally null item.
 
 ;
-; Entry:     IX = Pointer to fileinfo block (FIB_DRV accessed)
+; Entry:     IX = Pointer to fileinfo block (FIB_DRIVE_NUMBER accessed)
 ;	     DE = Pointer to filename in buffer
 ;	     HL = Pointer to validated unit descriptor (if PC_VAL
 ;		  and PC_DISK flags are both set)
@@ -518,7 +519,7 @@ next_not_last:	call	NEXT_DIR
 ; and if so it returns with the device descriptor pointer in HL, otherwise  HL
 ; is  preserved, since it may be a unit descriptor pointer.  It must be passed
 ; a pointer to the fileinfo block so that it can store the device  descriptor
-; and  device entry table address at "FIB_ID" if a device match is found.  It
+; and  device entry table address at "FIB_VOLUME_ID" if a device match is found.  It
 ; is a global routine because "find_new"  must  use  it  after  applying  its
 ; template filename in case this gives a device name.
 ;
@@ -536,17 +537,17 @@ next_not_last:	call	NEXT_DIR
 		jr	nc,check_not_dev	; with A=0 if it is not.
 ;
 		pop	af
-		ld	(ix+FIB_ID##),l		;Store the device descriptor
-		ld	(ix+FIB_ID##+1),h	; pointer in the FIB.
+		ld	(ix+FIB_VOLUME_ID##),l		;Store the device descriptor
+		ld	(ix+FIB_VOLUME_ID##+1),h	; pointer in the FIB.
 		push	hl
-		ld	bc,DD_ADDR##
+		ld	bc,DD_DEVICE_HANDLER_ADDRESS##
 		add	hl,bc			;Also get the jump table
 		ld	c,(hl)			; address from the descriptor
 		inc	hl			; and store it in the FIB
 		ld	b,(hl)			; as well.
-		ld	(ix+FIB_ID##+2),c
-		ld	(ix+FIB_ID##+3),b
-		ld	bc,DD_MODE##-(DD_ADDR##+1) ;Get device flags from
+		ld	(ix+FIB_VOLUME_ID##+2),c
+		ld	(ix+FIB_VOLUME_ID##+3),b
+		ld	bc,DD_MODE##-(DD_DEVICE_HANDLER_ADDRESS##+1) ;Get device flags from
 		add	hl,bc			   ; the device descriptor
 		ld	a,(hl)
 ;
@@ -569,16 +570,16 @@ FIRST_DIR:
 ; the first cluster of the directory (which will be -ve  if  it  is  the  root
 ; directory) in the variable "DE_START".
 ;
-; Entry:       IX = Address of fileinfo block (FIB_DRV must be set up)
+; Entry:       IX = Address of fileinfo block (FIB_DRIVE_NUMBER must be set up)
 ; Returns:      A = Error code (flags not set)
 ;	       HL = Address of validated unit descriptor
 ; Corrupts:   AF,DE,HL
 ;
-; Assumes:     UD_PATH=UD_CDIR+2
+; Assumes:     UD_CURRENT_DIR_PATH=UD_CURRENT_DIR_FIRST_CLUSTER+2
 ;
 ;
 		push	bc
-		ld	c,(ix+FIB_DRV##)	;Validate the drive in
+		ld	c,(ix+FIB_DRIVE_NUMBER##)	;Validate the drive in
 		ld	b,0			; question and give up
 		pcall	VAL_FIB			; if there was any error.
 		pop	bc
@@ -590,7 +591,7 @@ FIRST_DIR:
 		bit	PC_ROOT,(iy+@PC_FLAGS##);Skip if root directory
 		jr	nz,start_root_nz	; is required.
 ;
-		ld	de,UD_CDIR##		;Get current directory cluster
+		ld	de,UD_CURRENT_DIR_FIRST_CLUSTER##		;Get current directory cluster
 		add	hl,de			; number from unit descriptor.
 		ld	e,(hl)
 		inc	hl
@@ -606,7 +607,7 @@ FIRST_DIR:
 ;
 		ld	bc,(STR_PTR##)		;Save string pointer
 		push	bc
-		push	hl			;Save UD_CDIR pointer
+		push	hl			;Save UD_CURRENT_DIR_FIRST_CLUSTER pointer
 ;
 		ld	a,d			;If cluster is known (<>0) then
 		or	e			; clear flag to suppress disk
@@ -615,7 +616,7 @@ FIRST_DIR:
 relocate_dir:
 		inc	hl			;Set string pointer to point
 		ld	(STR_PTR##),hl		; to current directory string.
-		ld	bc,-UD_PATH##
+		ld	bc,-UD_CURRENT_DIR_PATH##
 		add	hl,bc			;Point back at unit descr.
 		push	de
 		call	start_root		;Start at root directory
@@ -903,7 +904,7 @@ not_dot_name:	push	hl
 		jr	c,tst_name_ret
 ;
 		ld	bc,11*256+CFM_UP+CFM_VOL;If volume name bit set then
-		bit	AT_VOL,(ix+FIB_SA##)	; treat all 11 bytes as
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	; treat all 11 bytes as
 		jr	nz,tst_vol_name		; one name.
 ;
 		ld	bc,8*256+0		;Check that 8 character
@@ -987,7 +988,7 @@ tst_dev_loop:	pop	hl
 ;
 		push	hl
 		push	de
-		ld	bc,DD_NAME##
+		ld	bc,DD_DEVICE_NAME##
 		add	hl,bc			;Compare the name in the
 		ld	b,8			; device descriptor with
 cmp_dev_loop:	ld	a,(de)			; the 8 bytes of the given
@@ -1068,7 +1069,7 @@ ADD_WPTH:
 ; "SQ_NAME" is called to convert the name into an ASCIIZ string  in  a  buffer
 ; before adding it to the whole path string.
 
-; Entry:     IX -> Fileinfo block, (only FIB_SA examined)
+; Entry:     IX -> Fileinfo block, (only FIB_SEARCH_ATTRIBUTES examined)
 ;	     DE -> New item to be added (11 byte buffer)
 ;	      B =  Parse flags for this item (PF_DOT and PF_2DOT are tested)
 ; Returns:    A =  Error code if overflow or underflow (flags set)
@@ -1144,14 +1145,14 @@ allow_errors:	or	a			; whole path string with
 ; The first character of the filename is passed in register A rather  than  at
 ; (DE)  to  allow for the special 05h fiddle if the filename is in a directory
 ; entry. A pointer to a fileinfo block must also be passed in register IX, and
-; this is only used to look at the search attributes ("FIB_SA" field)  to  see
+; this is only used to look at the search attributes ("FIB_SEARCH_ATTRIBUTES" field)  to  see
 ; whether it is a volume name or not.  The buffer is pre filled wil nulls just
 ; to keep things nice and tidy.
 ;
 ; Entry:     DE -> Expanded 11 byte filename
 ;	     HL -> Space for ASCIIZ string (13 bytes)
 ;	      A =  First character of filename
-;	     IX -> Fileinfo block (only FIB_SA is used)
+;	     IX -> Fileinfo block (only FIB_SEARCH_ATTRIBUTES is used)
 ; Returns:   DE =  DE+11
 ;	     HL -> Terminating null of ASCIIZ string
 ; Corrupts:  AF,DE,HL
@@ -1166,7 +1167,7 @@ sq_zero_loop:	ld	(hl),0			; with nulls for neatness'
 		pop	hl
 ;
 		ld	bc,11*256+CFM_UP+CFM_VOL;If volume name flag is set
-		bit	AT_VOL,(ix+FIB_SA##)	; then treat whole 11 bytes
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	; then treat whole 11 bytes
 		jr	nz,sq_volume_name	; as one name & don't upper
 						; case it.
 ;

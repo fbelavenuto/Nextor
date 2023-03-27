@@ -1,8 +1,9 @@
 	.z80
+	name('init')
 	title	INIT - MSXDOS and DISK BASIC initializer
-
-	INCLUDE	CONDASM.INC
-	INCLUDE CONST.INC
+;
+	INCLUDE	../condasm.inc
+	INCLUDE ../const.inc
 ;
 ;	Conditional assembly switch
 ;
@@ -151,7 +152,7 @@ START:
 	subttl	ROM header
 
 if BANKED
-	include	BANK.INC
+	include	../bank.inc
 endif
 ;
 ;	Version and copyright strings.
@@ -159,9 +160,9 @@ endif
 _$DOSVER::
 DOSV0::
 	defb	"Nextor kernel version "
-	defb	NXTVER##+"0", ".", NXTV_HI##+"0" 
+	defb	MAIN_NEXTOR_VERSION##+"0", ".", SEC_NEXTOR_VERSION_HIGH##+"0" 
 	
-	defb ".", NXTV_LO##+"0"
+	defb ".", SEC_NEXTOR_VERSION_LOW##+"0"
 
 	INCLUDE betainfo.mac
 	defb	0
@@ -945,14 +946,14 @@ VER_CHK:
 ;
 ;	I am not the first.  check to see if I can be the new master.
 ;
-	ld	a,(IN_EMU##)	;If in disk emulation mode, disable myself
+	ld	a,(IN_EMU_MODE##)	;If in disk emulation mode, disable myself
 	or	a
 	ret	nz
 
 	ld	a,(NXT_VER##)	;If previous master is MSX-DOS (not Nextor) then I become master.
 	or	a
 	jr	z,MAST_OK
-	cp	16*NXTVER##+NXTV_HI##	;If old master is same or newer than I
+	cp	16*MAIN_NEXTOR_VERSION##+SEC_NEXTOR_VERSION_HIGH##	;If old master is same or newer than I
 	jr	nc,SLAVE	; become its slave.
 ;
 MAST_OK:
@@ -971,9 +972,9 @@ OVERRIDE:
 ;
 ;	I am the real master or am overriding the old one.
 ;
-	ld	a,99h		;16*DOSVER##+DOSV_HI##
+	ld	a,99h		;16*DOSVER##+SEC_DOS_VERSION_HIGH##
 	ld	(DOS_VER##),a	;set new DOS version
-	ld	a,16*NXTVER##+NXTV_HI##
+	ld	a,16*MAIN_NEXTOR_VERSION##+SEC_NEXTOR_VERSION_HIGH##
 	ld	(NXT_VER##),a
 ;
 ;	Set up hook for clean up procedure
@@ -1022,7 +1023,7 @@ SLAVE:
 	;PROCNM+6: Number of drives actually assigned
 	;PROCNM+7: 1 to boot in DOS 1 mode
 	;PROCNM+8: 1 if device-based driver
-	;IN_EMU: 1 if in disk emulation mode (set by AUTODRV in partit.mac)
+	;IN_EMU_MODE: 1 if in disk emulation mode (set by AUTODRV in partit.mac)
     ;PROCNM+10: <>0 if the driver provides configuration
 
 	;Calculate how many work area space can be allocated, it will be:
@@ -1421,18 +1422,10 @@ OKDOSINIT:
 	ld	hl,(HIMEM##)	;save HIMEM
 	ld	(HIMSAV##),hl	;
 ;
-	ld	hl,H.TIMI	;Save the current setting of
-	push	hl		; the timer interrupt hook
-	ld	de,TIMI_SAVE##	; in our data area.
-	ld	bc,5
-	ldir
-	ld	hl,_TIME_IRQ##
+	ld	hl,TIMI_SAVE##
 	ld	de,@TIME_IRQ##
-	call	MYHOOK
-	pop	hl		;Now set up an inter-slot call
+	call SAVE_AND_PATCH_HTIMI
 
-	ld	de,@TIME_IRQ##
-	call	MYHOOK
 ;
 ;	Establish extended BIOS hook
 ;
@@ -1756,8 +1749,13 @@ SET_DISKBASIC::
 	ld	hl,DBABORT##
 	ld	(BREAKVECT##),hl
 ;
-	ld	bc,($MAXSEC##)	;Allocate sector buffer for DSKI$, DSKO$
+	ld a,(MFLAGS##)
+	and	16	;KILLD
+	ld hl,($SECBUF##)
+	jr nz,SET_DIRBUF	;Allocate sector buffer for DSKI$, DSKO$
+	ld	bc,($MAXSEC##)	;unless KILLDSKIO env item is set
 	call	RESERVE_BASIC
+SET_DIRBUF:
 	ld	($DIRBUF##),hl
 	ld	(PATHNAM##),hl	;Reuse this as Disk BASIC's pathname buffer
 ;
@@ -1989,36 +1987,46 @@ endif
 ;
 ;------------------------------------------------------------------------------
 ;
+;  Timer interrupt handler.
+;
+;  Note that both in normal mode and in DOS 1 mode jumping to the previous
+;  hook will trigger the chain of interrupt routines for the drivers
+;  attached to MSX-DOS 1 kernels (each will call its "previous hook"
+;  as configured in HOOKSAV).
+
 TIMINT::
 	push	af	;Save VDP status
 	ld	a,(DOS_VER##)
 	or	a
 	jr	nz,DOS2INT
 
-	;Interrupt handler, DOS 1 version
 
-	call	TIMI_NEX	;Call Nextor kernels driver interrupt routine.
-	ex	af,af'
-	pop	af		;Restore VDP status
-	ex	af,af'
-	ld	a,3
-	ld	ix,PRV1INT##
-	jp	CALBNK##
+	;Interrupt handler, DOS 1 mode version
 
-	;Interrupt handler, DOS 2 version
+	call	TIMI_NEXTOR_DRV	;Call interrupt routine for Nextor drivers.
+	pop	af		;Restore VDP status.
+	jp TM1_SAVE##	;Jump to the previous interrupt routine.
+
+
+	;Interrupt handler, normal ("DOS 2 mode") version
 
 DOS2INT:
 	call	TIME_IRQ##	;Call the master interrupt routine.
-	call	TIMI_DRV	;Call driver interrupt routine in turn.
-	call	TIMI_NEX	;Call Nextor kernels driver interrupt routine.
-	pop	af		;Restore VDP status
-	jp	TIMI_SAVE##
+	call	TIMI_DOS2_DRV	;Call interrupt routines of drivers attached to DOS 2 kernels.
+	call	TIMI_NEXTOR_DRV	;Call interrupt routine for Nextor drivers.
+	pop	af		;Restore VDP status.
+	jp	TIMI_SAVE##	;Jump to the previous interrupt routine.
 
-TIMI_DRV:
+
+TIMI_DOS2_DRV:
 ;
-;	Call all possible disk drivers interrupt which is combined with
-;	new DOS2 code. This is because the disk drivers entry may not
-;	be revealed at this point (because of local banking)
+;   Call the interrupt routines of drivers attached to MSX-DOS 2 kernels.
+;   These are the ones that have an entry in HOOKSAV whose slot number matches
+;   the entry with the same index in DRVTBL, thus representing a "my hook" entry
+;   (if the slot number is different then the HOOKSAV entry has been
+;   set by a driver attached to a MSX-DOS 1 kernel, and in this case
+;   it represents a "previous hook" entry and the driver itself will call it
+;   at the end of its own interrupt routine).
 ;
 	ld	de,DRVTBL
 	ld	hl,HOOKSAV
@@ -2029,14 +2037,11 @@ scan_loop:
 	ret	z		; yes, done
 
 	inc	de
-	ld	a,(de)		;Get slot address
+	ld	a,(de)		;Get slot address from DRVTBL
 	inc	de
-	cp	(hl)		; same?
-	jr	nz,next_cart	; no, this has been set by
-				; old SETINT
-	ld	a,(MASTER_SLOT##)
-	cp	(hl)		;Is it me?
-	ld	a,(hl)		; assume not
+	cp	(hl)		; same slot number in equivalent HOOKSAV entry?
+	jr	nz,next_cart	; no, HOOKSAV entry has been set by DOS 1 SETINT
+	ld	a,(hl)		; slot number
 	push	bc		; save count
 	push	de		;  DRVTBL pointer
 	push	hl		;  HOOKSAV pointer
@@ -2044,11 +2049,10 @@ scan_loop:
 	ld	e,(hl)
 	inc	hl
 	ld	d,(hl)
-	push	af
-	pop	iy
+	db	0FDh,67h	;LD IYh,A
 	push	de
 	pop	ix
-	call	call_drv
+	call	CALSLT
 	pop	hl
 	pop	de
 	pop	bc
@@ -2059,14 +2063,11 @@ next_cart:
 	djnz	scan_loop
 	ret
 ;
-call_drv:
-	jp	nz,CALSLT	;Was slave, call thru inter-slot call
-	jp	(ix)		;Was me, just call my slot.
 ;
 ;
-TIMI_NEX:
+TIMI_NEXTOR_DRV:
 ;
-;       Call the interrupt routine of Nextor kernels
+;   Call the interrupt routine of all drivers attached to Nextor kernels.
 ;
 	ld	hl,KERNEX
 	ld	b,4
@@ -2092,6 +2093,10 @@ TNEX_DJNZ:
 	inc	hl
 	djnz	TNEX_LOOP
 	ret
+
+call_drv:
+	jp	nz,CALSLT	;Was slave, call thru inter-slot call
+	jp	(ix)		;Was me, just call my slot.
 
 ;
 	;public	PROMPT
@@ -2183,35 +2188,6 @@ ADDHLBC:
 	ld	c,a
 	ld	b,0
 	add	hl,bc
-	ret
-
-;
-;	Define disk driver's timer interrupt entry
-;
-;	HL = timer interrupt entry address
-;
-	public	SETINT
-SETINT:
-	ex	de,hl		; de = interrupt entry
-	call	GSLOT1##
-	push	af		; save slot number
-	call	GET_DISKID_HL
-	ld	a,(hl)	;(DISKID)	; make a pointer to HOOKSAV
-	ld	hl,HOOKSAV
-	call	ADDHLBC
-	add	hl,bc
-	add	hl,bc
-	pop	af
-	ld	(hl),a
-	inc	hl
-	ld	(hl),e
-	inc	hl
-	ld	(hl),d
-;
-;	Return from disk driver interrupt (was jump to previous hook in DOS1)
-;
-	public	PRVINT
-PRVINT:
 	ret
 
 ;
@@ -2420,7 +2396,7 @@ COUNTDRV:
 	ld b,a
 	ld	hl,DRVS2##
 	ld	(BK4_ADD##),hl
-	call	?C4PBK##
+	call	C4PBK##
 	ret
 
 JP_BOOT_SEC:
@@ -2515,7 +2491,7 @@ CHECK_1KEY:
     and 00000110b
 	jr	nz,OLDDOS	;OLDDOS will do the rest of work.
 
-	ld	a,(IN_EMU##)	;If in disk emulation mode (set by AUTODRV from DOSINIT),
+	ld	a,(IN_EMU_MODE##)	;If in disk emulation mode (set by AUTODRV from DOSINIT),
 	or	a               ;switch to DOS 1 mode
 	jr	nz,OLDDOS
 
@@ -2609,7 +2585,7 @@ NOCHCPU:
 	;the work area is already created in BUF_1,
 	;so just jump to area relocation procedure.
 
-	ld	a,(IN_EMU##)
+	ld	a,(IN_EMU_MODE##)
 	or	a
 	jr	nz,MK_EMU_TBL
 
@@ -2623,7 +2599,7 @@ NOCHCPU:
 	ld	(DVB_TABLE##),hl
 	ld	hl,AUTODRV##
 	ld	(BK4_ADD##),hl
-	call	?C4PBK##
+	call	C4PBK##
 
 	jr	MK_DVB_TBL
 
@@ -2633,7 +2609,7 @@ MK_EMU_TBL:
 	;then just copy from BUF_1 to it.
 	;Otherwise allocate space in page 3.
 
-    ld hl,(EMU_WK_AREA##)
+    ld hl,(EMU_WORK_AREA_ADDRESS##)
 	ld	a,h
 	or	l
 	jr	nz,OK_EMU_WK
@@ -2773,10 +2749,9 @@ olddos_9:
 	ld	de,@EXTBIO##
 	call	MYHOOK
 
-	ld	a,3		;Do a DOS1 style SETINT
-	ld	ix,SET1INT##
-	ld	hl,@TIME_IRQ##
-	call	CALBNK##
+	ld hl,TM1_SAVE##
+	ld de,@TIME_IRQ##
+	call SAVE_AND_PATCH_HTIMI
 	
 	ld	a,3
 	ld	(MAIN_BANK##),a
@@ -2784,7 +2759,26 @@ olddos_9:
 	ld	hl,58A8h		;Start of initialization of DOS1
 	push	hl			; CLEAN+11h (just after RET P) of
 	ld	a,3			; INIT.Z80, not INIT.MAC (this code).
-	jp	CHGBNK##
+	jp	CHGBNK
+
+
+; Make a copy of H.TIMI hook and then patch it to point to another address
+; of our slot via interslot call.
+;
+; In: HL = Address for the copy
+;     DE = New destination address (in main Nextor kernel) for the hook
+
+SAVE_AND_PATCH_HTIMI:
+	push de
+	ex de,hl
+	ld hl,H.TIMI
+	push hl
+	ld bc,5
+	ldir
+	pop hl
+	pop de
+	jp MYHOOK
+
 ;
 else
 if STURBO
@@ -2976,7 +2970,7 @@ VERIFY:	CALLDOS	2Eh	;Set/reset verify flag
 BSEC_TYPE:
 	;1) Check for "VOL_ID", if found, return type 1
 
-	ld	hl,BOOTAD + UPB_VOLID##
+	ld	hl,BOOTAD + UPB_VOLUME_ID##
 	ld	de,VID_STR
 	ld	b,6
 	call	CP_FLSTR
@@ -2985,7 +2979,7 @@ BSEC_TYPE:
 
 	;2) Check for sector count >65535, if so, return type 2
 
-	ld	hl,BOOTAD + UPB_SEC##
+	ld	hl,BOOTAD + UPB_TOTAL_SECTORS##
 	ld	a,(hl)
 	inc	hl
 	or	(hl)
@@ -2994,12 +2988,12 @@ BSEC_TYPE:
 
 	;3) Check for EBS, if found, return type 2
 
-	ld	a,(BOOTAD + UPB_EBS##)
+	ld	a,(BOOTAD + UPB_EXTENDED_SIGNATURE##)
 	and	028h
 	cp	028h
 	jr	nz,NOEBS
 
-	ld	hl,BOOTAD + UPB_FILESYS##
+	ld	hl,BOOTAD + UPB_FILESYSTEM##
 	ld	de,FAT_STR
 	ld	b,4
 	call	CP_FLSTR
@@ -3112,7 +3106,7 @@ CHK_DRIVER:
 	ld	bc,CHK_CODE_SIZE
 	ldir
 
-	ld	hl,CHGBNK##
+	ld	hl,CHGBNK
 	ld	de,BUF+CHBANK_CODE-CHK_CODE_START
 	ld	bc,32
 	ldir
@@ -3156,7 +3150,7 @@ chkd_loop:
 
 chkd_ok:
 	xor	a
-	jp	CHGBNK##	;Now we use CHGBNK directly because
+	jp	CHGBNK	;Now we use CHGBNK directly because
 				;we know that the bank has a valid driver
 
 	;Not found, show error message and halt the system

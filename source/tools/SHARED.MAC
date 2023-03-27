@@ -1,7 +1,7 @@
 	title	MSX-DOS 2.50 - Common file for utility applications
 
 	.Z80
-	include	MACROS.INC
+	include macros.inc
 
 ;-----------------------------------------------------------------------------
 ;
@@ -98,7 +98,7 @@ EXTPAR::	or	a	;Terminate with error if A = 0
 	push	de
 	push	ix
 	ld	ix,0	;IXl: Number of parameters
-	ld_ixh_a	;IXh: Parameter to be extracted
+	ld	ixh,a	;IXh: Parameter to be extracted
 	ld	hl,81h
 
 PASASPC:
@@ -119,9 +119,9 @@ PASAPAR:	ld	a,(hl)	;Traverse parameter characters
 	jr	PASAPAR
 
 ENDPNUM:
-	ld_a_ixh	;Error if parameter index
+	ld	a,ixh	;Error if parameter index
 	dec	a	;is larger that the number of parameters
-	cp_ixl
+	cp	ixl
 	jr	nc,EXTPERR
 
 	ld	hl,81h
@@ -131,7 +131,7 @@ PASAP2:	ld	a,(hl)	;Skip spaces until finding next parameter
 	inc	hl
 	jr	z,PASAP2
 
-	ld_a_ixh	;If it is the desired parameter, extract it.
+	ld	a,ixh	;If it is the desired parameter, extract it.
 	cp	B	;Otherwise...
 	jr	z,PUTINDE0
 
@@ -161,7 +161,7 @@ ENDPUT:	xor	a
 	ld	(de),a
 	dec	b
 
-	ld_a_ixl
+	ld	a,ixl
 	or	a
 	jr	FINEXTP
 EXTPERR:

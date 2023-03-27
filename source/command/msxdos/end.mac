@@ -1,3 +1,4 @@
+	name('END')
 	TITLE	MSX-DOS 2 - MSX-DOS.SYS copyright (1986) IS Systems Ltd.
 	SUBTTL	End Module
 ;

@@ -1,4 +1,5 @@
-	.z80
+ï»¿	.z80
+	name('msg')
 	title	MSX-DOS 2 ROM   Copyright (1986)  IS Systems Ltd.
 	subttl	Messages for disk ROM
 ;-----------------------------------------------------------------------------
@@ -239,7 +240,7 @@ ERR_MSG_TABLE:
 	err	.PUSED, <"Partition is already in use">
 	err	.FMNT,  <"File is mounted">
 	err	.BFSZ,  <"Bad file size">
-	err	.ICLUS, <"Invalid cluster number">
+	err	.ICLUS, <"Invalid cluster number or sequence">
 ;
 ;
 ;    The following are errors which the KBDOS may pass to the  ABORT  routine.
@@ -258,7 +259,7 @@ ERR_MSG_TABLE:
 ; useful to return some of these errors.
 ;
 	err	.BADCOM,<"Wrong version of command">
-	err	.BADCM,	<"Unrecognized command">
+	err	.BADCMD,<"Unrecognized command">
 	err	.BUFUL,	<"Command too long">
 ;
 	err	.IPARM,	<"Invalid parameter">
@@ -285,78 +286,46 @@ ERR_MSG_TABLE:
 ;
 msg_num defl	0
 ;
-msg	macro	name,text
-	 local	 length,start		;;Macro to assign mesage numbers,
-msg_num  defl	 msg_num+1		;; declare them external, and add the
-__&name  equ	 msg_num		;; message to the message table.
-	 public  __&name
-	 defb	 __&name
-	 defb	 length
-start:	 defb	 text
-	 defb	 0
-length	 equ	 $-start
-	endm
 ;
 ;	----------------------------------------
 ;
 ROM_KMSG_TABLE:
 ;
-	;msg	NORAM,	<"ƒƒ‚ƒŠ‚ª‘«‚è‚Ü‚¹‚ñ">
+	.strenc shift_jis
+
+	;msg	NORAM,	<"ãƒ¡ãƒ¢ãƒªãŒè¶³ã‚Šã¾ã›ã‚“">
 	;msg	TOOMD,	<"Driver table is corrupted:",13,10,"Too many drives allocated">
-	 msg	TOOMD,	<"ƒhƒ‰ƒCƒo‚Ìƒe[ƒuƒ‹‚ª‰ó‚ê‚Ä‚¢‚Ü‚·:",13,10,"ƒhƒ‰ƒCƒu‚ÌŠ„‚è“–‚Ä‚ª‘½‚·‚¬‚Ü‚·">
+	 msg	TOOMD,	<"ãƒ‰ãƒ©ã‚¤ãƒã®ãƒ†ãƒ¼ãƒ–ãƒ«ãŒå£Šã‚Œã¦ã„ã¾ã™:",13,10,"ãƒ‰ãƒ©ã‚¤ãƒ–ã®å‰²ã‚Šå½“ã¦ãŒå¤šã™ãŽã¾ã™">
 
 	;msg	NOEMP,	<"Driver table is corrupted:",13,10,"Unexpected non-empty",13,10,"entry found">
-	 msg	NOEMP,	<"ƒhƒ‰ƒCƒo‚Ìƒe[ƒuƒ‹‚ª‰ó‚ê‚Ä‚¢‚Ü‚·:",13,10,"—\‘zŠO‚Ì”ñ‹ó‚ÌƒGƒ“ƒgƒŠ‚ªŒ©‚Â‚©‚è‚Ü‚µ‚½">
+	 msg	NOEMP,	<"ãƒ‰ãƒ©ã‚¤ãƒã®ãƒ†ãƒ¼ãƒ–ãƒ«ãŒå£Šã‚Œã¦ã„ã¾ã™:",13,10,"äºˆæƒ³å¤–ã®éžç©ºã®ã‚¨ãƒ³ãƒˆãƒªãŒè¦‹ã¤ã‹ã‚Šã¾ã—ãŸ">
 	;msg	BADDI,	<"Boot error: disk controller",13,10,"ID does not match size of",13,10,"driver table">
-	 msg	BADDI,	<"‹N“®ƒGƒ‰[F",13,10,"ƒfƒBƒXƒNƒRƒ“ƒgƒ[ƒ‰”Ô†ƒhƒ‰ƒCƒo[ƒe[ƒuƒ‹‚ÌƒTƒCƒY‚Æˆê’v‚µ‚Ü‚¹‚ñ">
+	 msg	BADDI,	<"èµ·å‹•ã‚¨ãƒ©ãƒ¼ï¼š",13,10,"ãƒ‡ã‚£ã‚¹ã‚¯ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ç•ªå·ãƒ‰ãƒ©ã‚¤ãƒãƒ¼ãƒ†ãƒ¼ãƒ–ãƒ«ã®ã‚µã‚¤ã‚ºã¨ä¸€è‡´ã—ã¾ã›ã‚“">
 	;msg	INITE,	<"Boot error:",13,10,"Kernel initialization code",13,10,"failed, code: ">
-	 msg	INITE,	<"‹N“®ƒGƒ‰[F",13,10,"ƒJ[ƒlƒ‹‚Ì‰Šú‰»ƒR[ƒh‚ÉŽ¸”s‚µ‚Ü‚µ‚½B ƒR[ƒh: ">
+	 msg	INITE,	<"èµ·å‹•ã‚¨ãƒ©ãƒ¼ï¼š",13,10,"ã‚«ãƒ¼ãƒãƒ«ã®åˆæœŸåŒ–ã‚³ãƒ¼ãƒ‰ã«å¤±æ•—ã—ã¾ã—ãŸã€‚ ã‚³ãƒ¼ãƒ‰: ">
 	;msg	BHIM,   <"Boot error:",13,10,"Not enough memory for",13,10,"BASIC variables">
-	 msg	BHIM,   <"‹N“®ƒGƒ‰[F",13,10,"BASIC•Ï”‚Ìƒƒ‚ƒŠ‚ª‘«‚è‚Ü‚¹‚ñ">
+	 msg	BHIM,   <"èµ·å‹•ã‚¨ãƒ©ãƒ¼ï¼š",13,10,"BASICå¤‰æ•°ã®ãƒ¡ãƒ¢ãƒªãŒè¶³ã‚Šã¾ã›ã‚“">
 
 ;
-	msg	FMT1,	<"ƒhƒ‰ƒCƒu–¼‚Í? (">
+	msg	FMT1,	<"ãƒ‰ãƒ©ã‚¤ãƒ–åã¯? (">
 	msg	FMT2,	<") ">
-	msg	STRIKE,	<"‰½‚©ƒL[‚ð‰Ÿ‚µ‚Ä‰º‚³‚¢ ">
-	msg	ABORT,	<"‘Å‚¿Ø‚ç‚ê‚Ü‚µ‚½">
-	msg	FORMAT,	<"ƒtƒH[ƒ}ƒbƒg‚ªŠ®—¹‚µ‚Ü‚µ‚½">
+	msg	STRIKE,	<"ä½•ã‹ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ä¸‹ã•ã„ ">
+	msg	ABORT,	<"æ‰“ã¡åˆ‡ã‚‰ã‚Œã¾ã—ãŸ">
+	msg	FORMAT,	<"ãƒ•ã‚©ãƒ¼ãƒžãƒƒãƒˆãŒå®Œäº†ã—ã¾ã—ãŸ">
 ;
-	msg	PRM1,	<"ƒhƒ‰ƒCƒu">
-	msg	PRM2,	<":—p‚ÌƒfƒBƒXƒN‚ð“ü‚ê‚Ä">
-	msg	PRM3,	<"‰½‚©ƒL[‚ð‰Ÿ‚µ‚Ä‰º‚³‚¢">
+	msg	PRM1,	<"ãƒ‰ãƒ©ã‚¤ãƒ–">
+	msg	PRM2,	<":ç”¨ã®ãƒ‡ã‚£ã‚¹ã‚¯ã‚’å…¥ã‚Œã¦">
+	msg	PRM3,	<"ä½•ã‹ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ä¸‹ã•ã„">
 ;
 	msg	ASTS,	<"*** ">
 ;
-	msg	SYS_ER,	<"ƒVƒXƒeƒ€ƒGƒ‰[ ">
-	msg	USR_ER,	<"ƒ†[ƒU[ƒGƒ‰[ ">
+	msg	SYS_ER,	<"ã‚·ã‚¹ãƒ†ãƒ ã‚¨ãƒ©ãƒ¼ ">
+	msg	USR_ER,	<"ãƒ¦ãƒ¼ã‚¶ãƒ¼ã‚¨ãƒ©ãƒ¼ ">
 ;
 	defb	0		;End of table
 ;
 ;
 ;-----------------------------------------------------------------------------
-;
-warn	macro	text
-	 if1
-	  .printx % text
-	 endif
-	endm
-;
-;
-err	macro	code,text
-	 local	 start,length
-	 defb	 code&##
-	 defb	 length
-start:	 defb	 text
-	 defb	 0
-length	 equ	 $-start
-	 if1
-	  if	  length gt 64
-	   warn	   <Error message for '&code' is too long>
-	  endif
-	 endif
-	endm
-;
-;	----------------------------------------
 ;
 ERR_KMSG_TABLE:
 ;
@@ -364,121 +333,123 @@ ERR_KMSG_TABLE:
 ; expect  to  be  passed,  although such a routine should be general enough to
 ; handle any error code.
 ;
-	err	.NCOMP,	<"‚±‚ÌƒfƒBƒXƒN‚ÍŽg—p‚Å‚«‚Ü‚¹‚ñ">
-	err	.WRERR,	<"‘‚«ž‚ÝˆÙí‚Å‚·">
-	err	.DISK,	<"ƒfƒBƒXƒN‚ªˆÙí‚Å‚·">
-	err	.NRDY,	<"ƒfƒBƒXƒN‚ª“ü‚Á‚Ä‚¢‚Ü‚¹‚ñ">
-	err	.VERFY,	<"³‚µ‚­‘‚«ž‚Ü‚ê‚Ü‚¹‚ñ‚Å‚µ‚½">
-	err	.DATA,	<"ƒfƒBƒXƒN‚Ìƒf[ƒ^‚ªˆÙí‚Å‚·">
-	err	.RNF,	<"ƒZƒNƒ^[‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ">
-	err	.WPROT,	<"ƒfƒBƒXƒN‚ª‘‚«ž‚Ý•ÛŒì‚³‚ê‚Ä‚¢‚Ü‚·">
-	err	.UFORM,	<"ƒfƒBƒXƒN‚ªƒtƒH[ƒ}ƒbƒg‚³‚ê‚Ä‚¢‚Ü‚¹‚ñ">
-	err	.NDOS,	<"MSX-DOSƒfƒBƒXƒN‚Å‚Í‚ ‚è‚Ü‚¹‚ñ">
-	err	.WDISK,	<"ƒfƒBƒXƒN‚ªˆá‚¢‚Ü‚·">
-	err	.WFILE,	<"‚±‚Ìƒtƒ@ƒCƒ‹—p‚ÌƒfƒBƒXƒN‚Å‚Í‚ ‚è‚Ü‚¹‚ñ">
-	err	.SEEK,	<"ƒV[ƒNƒGƒ‰[‚Å‚·">
-	err	.IFAT,	<"FATˆÙí‚Å‚·">
-	err	.IFORM,	<"‚±‚Ìƒhƒ‰ƒCƒu‚ÍƒtƒH[ƒ}ƒbƒg‚Å‚«‚Ü‚¹‚ñ">
+	err	.NCOMP,	<"ã“ã®ãƒ‡ã‚£ã‚¹ã‚¯ã¯ä½¿ç”¨ã§ãã¾ã›ã‚“">
+	err	.WRERR,	<"æ›¸ãè¾¼ã¿ç•°å¸¸ã§ã™">
+	err	.DISK,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒç•°å¸¸ã§ã™">
+	err	.NRDY,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒå…¥ã£ã¦ã„ã¾ã›ã‚“">
+	err	.VERFY,	<"æ­£ã—ãæ›¸ãè¾¼ã¾ã‚Œã¾ã›ã‚“ã§ã—ãŸ">
+	err	.DATA,	<"ãƒ‡ã‚£ã‚¹ã‚¯ã®ãƒ‡ãƒ¼ã‚¿ãŒç•°å¸¸ã§ã™">
+	err	.RNF,	<"ã‚»ã‚¯ã‚¿ãƒ¼ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“">
+	err	.WPROT,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒæ›¸ãè¾¼ã¿ä¿è­·ã•ã‚Œã¦ã„ã¾ã™">
+	err	.UFORM,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒãƒ•ã‚©ãƒ¼ãƒžãƒƒãƒˆã•ã‚Œã¦ã„ã¾ã›ã‚“">
+	err	.NDOS,	<"MSX-DOSãƒ‡ã‚£ã‚¹ã‚¯ã§ã¯ã‚ã‚Šã¾ã›ã‚“">
+	err	.WDISK,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒé•ã„ã¾ã™">
+	err	.WFILE,	<"ã“ã®ãƒ•ã‚¡ã‚¤ãƒ«ç”¨ã®ãƒ‡ã‚£ã‚¹ã‚¯ã§ã¯ã‚ã‚Šã¾ã›ã‚“">
+	err	.SEEK,	<"ã‚·ãƒ¼ã‚¯ã‚¨ãƒ©ãƒ¼ã§ã™">
+	err	.IFAT,	<"FATç•°å¸¸ã§ã™">
+	err	.IFORM,	<"ã“ã®ãƒ‰ãƒ©ã‚¤ãƒ–ã¯ãƒ•ã‚©ãƒ¼ãƒžãƒƒãƒˆã§ãã¾ã›ã‚“">
 ;
 ;
 ;    The following errors are those which may be returned by KBDOS functions.
 ;
-	err	.INTER,	<"DOS‚ªˆÙí‚Å‚·">
+	err	.INTER,	<"DOSãŒç•°å¸¸ã§ã™">
 ;
-	err	.NORAM,	<"ƒƒ‚ƒŠ[•s‘«‚Å‚·">
-	err	.IBDOS,	<"–³Œø‚ÈMSX-DOSƒtƒ@ƒ“ƒNƒVƒ‡ƒ“”Ô†‚Å‚·">
+	err	.NORAM,	<"ãƒ¡ãƒ¢ãƒªãƒ¼ä¸è¶³ã§ã™">
+	err	.IBDOS,	<"ç„¡åŠ¹ãªMSX-DOSãƒ•ã‚¡ãƒ³ã‚¯ã‚·ãƒ§ãƒ³ç•ªå·ã§ã™">
 ;
-	err	.IDRV,	<"–³Œø‚Èƒhƒ‰ƒCƒu–¼‚Å‚·">
-	err	.IFNM,	<"•s³‚Èƒtƒ@ƒCƒ‹–¼‚Å‚·">
-	err	.IPATH,	<"–³Œø‚ÈƒpƒX–¼‚Å‚·">
-	err	.PLONG,	<"ƒpƒX–¼‚ª’·‰ß‚¬‚Ü‚·">
+	err	.IDRV,	<"ç„¡åŠ¹ãªãƒ‰ãƒ©ã‚¤ãƒ–åã§ã™">
+	err	.IFNM,	<"ä¸æ­£ãªãƒ•ã‚¡ã‚¤ãƒ«åã§ã™">
+	err	.IPATH,	<"ç„¡åŠ¹ãªãƒ‘ã‚¹åã§ã™">
+	err	.PLONG,	<"ãƒ‘ã‚¹åãŒé•·éŽãŽã¾ã™">
 ;
-	err	.NOFIL,	<"ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ">
-	err	.NODIR,	<"ƒfƒBƒŒƒNƒgƒŠ‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ">
-	err	.DRFUL,	<"ƒ‹[ƒgƒfƒBƒŒƒNƒgƒŠ‚ª‚¢‚Á‚Ï‚¢‚Å‚·">
-	err	.DKFUL,	<"ƒfƒBƒXƒN‚ª‚¢‚Á‚Ï‚¢‚Å‚·">
-	err	.DUPF,	<"ƒtƒ@ƒCƒ‹–¼‚ªd•¡‚µ‚Ä‚¢‚Ü‚·">
-	err	.DIRE,	<"ƒfƒBƒŒƒNƒgƒŠ‚ªˆÚ“®‚Å‚«‚Ü‚¹‚ñ">
-	err	.FILRO,	<"ƒtƒ@ƒCƒ‹‚ª“Ç‚Ýo‚µê—p‚Å‚·">
-	err	.DIRNE,	<"ƒfƒBƒŒƒNƒgƒŠ‚ª‹ó‚Å‚Í‚ ‚è‚Ü‚¹‚ñ">
-	err	.IATTR,	<"–³Œø‚È‘®«‚Å‚·">
-	err	.DOT,	<".‚â..‚É‘Î‚µ‚Ä‚Í‘€ì‚Å‚«‚Ü‚¹‚ñ">
-	err	.SYSX,	<"ƒVƒXƒeƒ€ƒtƒ@ƒCƒ‹‚ªŠù‚É‚ ‚è‚Ü‚·">
-	err	.DIRX,	<"ƒfƒBƒŒƒNƒgƒŠ‚ªŠù‚É‚ ‚è‚Ü‚·">
-	err	.FILEX,	<"ƒtƒ@ƒCƒ‹‚ªŠù‚É‚ ‚è‚Ü‚·">
-	err	.FOPEN,	<"ƒtƒ@ƒCƒ‹‚ªŽg—p’†‚Å‚·">
+	err	.NOFIL,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“">
+	err	.NODIR,	<"ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“">
+	err	.DRFUL,	<"ãƒ«ãƒ¼ãƒˆãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒã„ã£ã±ã„ã§ã™">
+	err	.DKFUL,	<"ãƒ‡ã‚£ã‚¹ã‚¯ãŒã„ã£ã±ã„ã§ã™">
+	err	.DUPF,	<"ãƒ•ã‚¡ã‚¤ãƒ«åãŒé‡è¤‡ã—ã¦ã„ã¾ã™">
+	err	.DIRE,	<"ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒç§»å‹•ã§ãã¾ã›ã‚“">
+	err	.FILRO,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãŒèª­ã¿å‡ºã—å°‚ç”¨ã§ã™">
+	err	.DIRNE,	<"ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒç©ºã§ã¯ã‚ã‚Šã¾ã›ã‚“">
+	err	.IATTR,	<"ç„¡åŠ¹ãªå±žæ€§ã§ã™">
+	err	.DOT,	<".ã‚„..ã«å¯¾ã—ã¦ã¯æ“ä½œã§ãã¾ã›ã‚“">
+	err	.SYSX,	<"ã‚·ã‚¹ãƒ†ãƒ ãƒ•ã‚¡ã‚¤ãƒ«ãŒæ—¢ã«ã‚ã‚Šã¾ã™">
+	err	.DIRX,	<"ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒæ—¢ã«ã‚ã‚Šã¾ã™">
+	err	.FILEX,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãŒæ—¢ã«ã‚ã‚Šã¾ã™">
+	err	.FOPEN,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãŒä½¿ç”¨ä¸­ã§ã™">
 ;
-	err	.OV64K,	<"64K‚ð‰z‚¦‚é“]‘—‚Í‚Å‚«‚Ü‚¹‚ñ">
-	err	.FILE,	<"ƒtƒ@ƒCƒ‹‚ÌŠ„“–ˆÙí‚Å‚·">
-	err	.EOF,	<"ƒtƒ@ƒCƒ‹‚ÌI‚í‚è‚Å‚·">
-	err	.ACCV,	<"ƒtƒ@ƒCƒ‹ƒAƒNƒZƒXˆÙí‚Å‚·">
+	err	.OV64K,	<"64Kã‚’è¶Šãˆã‚‹è»¢é€ã¯ã§ãã¾ã›ã‚“">
+	err	.FILE,	<"ãƒ•ã‚¡ã‚¤ãƒ«ã®å‰²å½“ç•°å¸¸ã§ã™">
+	err	.EOF,	<"ãƒ•ã‚¡ã‚¤ãƒ«ã®çµ‚ã‚ã‚Šã§ã™">
+	err	.ACCV,	<"ãƒ•ã‚¡ã‚¤ãƒ«ã‚¢ã‚¯ã‚»ã‚¹ç•°å¸¸ã§ã™">
 ;
-	err	.IPROC,	<"–³Œø‚ÈƒvƒƒZƒXID‚Å‚·">
-	err	.NHAND,	<"ƒtƒ@ƒCƒ‹ƒnƒ“ƒhƒ‹‚ª‘«‚è‚Ü‚¹‚ñ">
-	err	.IHAND,	<"–³Œø‚Èƒtƒ@ƒCƒ‹ƒnƒ“ƒhƒ‹‚Å‚·">
-	err	.NOPEN,	<"ƒtƒ@ƒCƒ‹ƒnƒ“ƒhƒ‹‚ªƒI[ƒvƒ“‚³‚ê‚Ä‚¢‚Ü‚¹‚ñ">
-	err	.IDEV,	<"–³Œø‚ÈƒfƒoƒCƒXƒIƒyƒŒ[ƒVƒ‡ƒ“‚Å‚·">
+	err	.IPROC,	<"ç„¡åŠ¹ãªãƒ—ãƒ­ã‚»ã‚¹IDã§ã™">
+	err	.NHAND,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãƒãƒ³ãƒ‰ãƒ«ãŒè¶³ã‚Šã¾ã›ã‚“">
+	err	.IHAND,	<"ç„¡åŠ¹ãªãƒ•ã‚¡ã‚¤ãƒ«ãƒãƒ³ãƒ‰ãƒ«ã§ã™">
+	err	.NOPEN,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãƒãƒ³ãƒ‰ãƒ«ãŒã‚ªãƒ¼ãƒ—ãƒ³ã•ã‚Œã¦ã„ã¾ã›ã‚“">
+	err	.IDEV,	<"ç„¡åŠ¹ãªãƒ‡ãƒã‚¤ã‚¹ã‚ªãƒšãƒ¬ãƒ¼ã‚·ãƒ§ãƒ³ã§ã™">
 ;
-	err	.IENV,	<"–³Œø‚ÈŠÂ‹«•Ï”‚Å‚·">
-	err	.ELONG,	<"ŠÂ‹«•Ï”‚ª’·‰ß‚¬‚Ü‚·">
+	err	.IENV,	<"ç„¡åŠ¹ãªç’°å¢ƒå¤‰æ•°ã§ã™">
+	err	.ELONG,	<"ç’°å¢ƒå¤‰æ•°ãŒé•·éŽãŽã¾ã™">
 ;
-	err	.IDATE,	<"–³Œø‚È“ú•t‚¯‚Å‚·">
-	err	.ITIME,	<"–³Œø‚ÈŽžŠÔ‚Å‚·">
+	err	.IDATE,	<"ç„¡åŠ¹ãªæ—¥ä»˜ã‘ã§ã™">
+	err	.ITIME,	<"ç„¡åŠ¹ãªæ™‚é–“ã§ã™">
 ;
-	err	.RAMDX,	<"RAM DISK(ƒhƒ‰ƒCƒuH:)‚ÍŠù‚É‚ ‚è‚Ü‚·">
-	err	.NRAMD,	<"RAM DISK‚ª‚ ‚è‚Ü‚¹‚ñ">
+	err	.RAMDX,	<"RAM DISK(ãƒ‰ãƒ©ã‚¤ãƒ–H:)ã¯æ—¢ã«ã‚ã‚Šã¾ã™">
+	err	.NRAMD,	<"RAM DISKãŒã‚ã‚Šã¾ã›ã‚“">
 ;
-	err	.HDEAD,	<"ƒtƒ@ƒCƒ‹‚ªÁ‹Ž‚³‚ê‚Ä‚¢‚Ü‚·">
-	err	.ISBFN,	<"–³Œø‚ÈƒTƒuƒtƒ@ƒ“ƒNƒVƒ‡ƒ“”Ô†‚Å‚·">
-	err	.IFCB,	<"–³Œø‚ÈFCB‚Å‚·">
+	err	.HDEAD,	<"ãƒ•ã‚¡ã‚¤ãƒ«ãŒæ¶ˆåŽ»ã•ã‚Œã¦ã„ã¾ã™">
+	err	.ISBFN,	<"ç„¡åŠ¹ãªã‚µãƒ–ãƒ•ã‚¡ãƒ³ã‚¯ã‚·ãƒ§ãƒ³ç•ªå·ã§ã™">
+	err	.IFCB,	<"ç„¡åŠ¹ãªFCBã§ã™">
 
 	;TODO: Check these translations
-	err	.IDRVR, <"–³Œø‚ÈƒfƒBƒXƒNƒhƒ‰ƒCƒo‚Å‚·">	;<"Invalid disk driver">
-	err	.IDEVL,  <"–³Œø‚ÈƒfƒoƒCƒX‚Ü‚½‚Í˜_—ƒ†ƒjƒbƒg‚Å‚·">	;<"Invalid device or logical unit">
-	err	.IPART, <"–³Œø‚Èƒp[ƒeƒBƒVƒ‡ƒ“”Ô†">	;<"Invalid partition number">
-	err	.PUSED, <"ƒp[ƒeƒBƒVƒ‡ƒ“‚ªŽg—p’†‚Å‚·">	;<"Partition is already in use">
-	err	.FMNT,  <"ƒtƒ@ƒCƒ‹‚ªƒ}ƒEƒ“ƒg‚³‚ê‚Ä‚¢‚Ü‚·">     ;<"File is mounted">
-	err	.BFSZ,  <"–³Œø‚Èƒtƒ@ƒCƒ‹ƒTƒCƒY">           ;<"Bad file size">
-	err	.ICLUS, <"–³Œø‚ÈƒNƒ‰ƒXƒ^[”Ô†">		;<"Invalid cluster number">
+	err	.IDRVR, <"ç„¡åŠ¹ãªãƒ‡ã‚£ã‚¹ã‚¯ãƒ‰ãƒ©ã‚¤ãƒã§ã™">	;<"Invalid disk driver">
+	err	.IDEVL,  <"ç„¡åŠ¹ãªãƒ‡ãƒã‚¤ã‚¹ã¾ãŸã¯è«–ç†ãƒ¦ãƒ‹ãƒƒãƒˆã§ã™">	;<"Invalid device or logical unit">
+	err	.IPART, <"ç„¡åŠ¹ãªãƒ‘ãƒ¼ãƒ†ã‚£ã‚·ãƒ§ãƒ³ç•ªå·">	;<"Invalid partition number">
+	err	.PUSED, <"ãƒ‘ãƒ¼ãƒ†ã‚£ã‚·ãƒ§ãƒ³ãŒä½¿ç”¨ä¸­ã§ã™">	;<"Partition is already in use">
+	err	.FMNT,  <"ãƒ•ã‚¡ã‚¤ãƒ«ãŒãƒžã‚¦ãƒ³ãƒˆã•ã‚Œã¦ã„ã¾ã™">     ;<"File is mounted">
+	err	.BFSZ,  <"ç„¡åŠ¹ãªãƒ•ã‚¡ã‚¤ãƒ«ã‚µã‚¤ã‚º">           ;<"Bad file size">
+	err	.ICLUS, <"ç„¡åŠ¹ãªã‚¯ãƒ©ã‚¹ã‚¿ãƒ¼ç•ªå·ã¾ãŸã¯ã‚·ãƒ¼ã‚±ãƒ³ã‚¹">		;<"Invalid cluster number or sequence">
 ;
 ;
 ;    The following are errors which the KBDOS may pass to the  ABORT  routine.
 ; Of  cource  a  user  abort routine may see any other error but these are the
 ; ones which are generated internally and may require special case handling.
 ;
-	err	.STOP,	<"Ctrl-STOP‚ª‰Ÿ‚³‚ê‚Ü‚µ‚½">
-	err	.CTRLC,	<"Ctrl-C‚ª‰Ÿ‚³‚ê‚Ü‚µ‚½">
-	err	.ABORT,	<"ƒfƒBƒXƒN“üo—Í‚ª‘Å‚¿Ø‚ç‚ê‚Ü‚µ‚½">
-	err	.OUTERR,<"•W€o—Í‚ÅƒGƒ‰[‚ª‹N‚«‚Ü‚µ‚½">
-	err	.INERR,	<"•W€“ü—Í‚ÅƒGƒ‰[‚ª‹N‚«‚Ü‚µ‚½">
+	err	.STOP,	<"Ctrl-STOPãŒæŠ¼ã•ã‚Œã¾ã—ãŸ">
+	err	.CTRLC,	<"Ctrl-CãŒæŠ¼ã•ã‚Œã¾ã—ãŸ">
+	err	.ABORT,	<"ãƒ‡ã‚£ã‚¹ã‚¯å…¥å‡ºåŠ›ãŒæ‰“ã¡åˆ‡ã‚‰ã‚Œã¾ã—ãŸ">
+	err	.OUTERR,<"æ¨™æº–å‡ºåŠ›ã§ã‚¨ãƒ©ãƒ¼ãŒèµ·ãã¾ã—ãŸ">
+	err	.INERR,	<"æ¨™æº–å…¥åŠ›ã§ã‚¨ãƒ©ãƒ¼ãŒèµ·ãã¾ã—ãŸ">
 ;
 ;
 ;    The following errors are those generated by COMMAND.COM.  These will  not
 ; be  returned from KBDOS functions, but user application programs may find it
 ; useful to return some of these errors.
 ;
-	err	.BADCOM,<"ƒRƒ}ƒ“ƒh‚Ìƒo[ƒWƒ‡ƒ“‚ªˆá‚¢‚Ü‚·">
-	err	.BADCMD,<"ƒRƒ}ƒ“ƒh‚ªˆá‚¢‚Ü‚·">
-	err	.BUFUL,	<"ƒRƒ}ƒ“ƒh‚ª’·‚·‚¬‚Ü‚·">
+	err	.BADCOM,<"ã‚³ãƒžãƒ³ãƒ‰ã®ãƒãƒ¼ã‚¸ãƒ§ãƒ³ãŒé•ã„ã¾ã™">
+	err	.BADCMD,<"ã‚³ãƒžãƒ³ãƒ‰ãŒé•ã„ã¾ã™">
+	err	.BUFUL,	<"ã‚³ãƒžãƒ³ãƒ‰ãŒé•·ã™ãŽã¾ã™">
 ;
-	err	.IPARM,	<"–³Œø‚Èƒpƒ‰ƒ[ƒ^‚Å‚·">
-	err	.INP,	<"ƒpƒ‰ƒ[ƒ^‚ª‘½‚·‚¬‚Ü‚·">
-	err	.NOPAR,	<"ƒpƒ‰ƒ[ƒ^‚ª•s‘«‚µ‚Ä‚¢‚Ü‚·">
-	err	.IOPT,	<"–³Œø‚ÈƒIƒvƒVƒ‡ƒ“Žw’è‚Å‚·">
-	err	.BADNO,	<"–³Œø‚È”’l‚Å‚·">
+	err	.IPARM,	<"ç„¡åŠ¹ãªãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã§ã™">
+	err	.INP,	<"ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãŒå¤šã™ãŽã¾ã™">
+	err	.NOPAR,	<"ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãŒä¸è¶³ã—ã¦ã„ã¾ã™">
+	err	.IOPT,	<"ç„¡åŠ¹ãªã‚ªãƒ—ã‚·ãƒ§ãƒ³æŒ‡å®šã§ã™">
+	err	.BADNO,	<"ç„¡åŠ¹ãªæ•°å€¤ã§ã™">
 ;
-	err	.NOHELP,<"HELPƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ">
-	err	.BADVER,<"MSX-DOS‚Ìƒo[ƒWƒ‡ƒ“‚ªˆá‚¢‚Ü‚·">
+	err	.NOHELP,<"HELPãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“">
+	err	.BADVER,<"MSX-DOSã®ãƒãƒ¼ã‚¸ãƒ§ãƒ³ãŒé•ã„ã¾ã™">
 ;
-	err	.NOCAT,	<"•¡ŽÊæƒtƒ@ƒCƒ‹‚ÍŒ‹‡‚Å‚«‚Ü‚¹‚ñ">
-	err	.BADEST,<"ƒtƒ@ƒCƒ‹‚ðì¬‚Å‚«‚Ü‚¹‚ñ">
-	err	.COPY,	<"Ž©•ªŽ©g‚É‚ÍƒRƒs[‚Å‚«‚Ü‚¹‚ñ">
-	err	.OVDEST,<"ƒtƒ@ƒCƒ‹‚Ìd‚Ë‘‚«‚ª‚Å‚«‚Ü‚¹‚ñ">
+	err	.NOCAT,	<"è¤‡å†™å…ˆãƒ•ã‚¡ã‚¤ãƒ«ã¯çµåˆã§ãã¾ã›ã‚“">
+	err	.BADEST,<"ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ä½œæˆã§ãã¾ã›ã‚“">
+	err	.COPY,	<"è‡ªåˆ†è‡ªèº«ã«ã¯ã‚³ãƒ”ãƒ¼ã§ãã¾ã›ã‚“">
+	err	.OVDEST,<"ãƒ•ã‚¡ã‚¤ãƒ«ã®é‡ã­æ›¸ããŒã§ãã¾ã›ã‚“">
 ;
-	err	.INSDSK,<"MSX-DOS2 ‚ÌƒfƒBƒXƒN‚ðƒhƒ‰ƒCƒu ",7,": ‚É“ü‚ê‚Ä">
-	err	.PRAK,	<"‰½‚©ƒL[‚ð‰Ÿ‚µ‚Ä‰º‚³‚¢ ">
+	err	.INSDSK,<"MSX-DOS2 ã®ãƒ‡ã‚£ã‚¹ã‚¯ã‚’ãƒ‰ãƒ©ã‚¤ãƒ– ",7,": ã«å…¥ã‚Œã¦">
+	err	.PRAK,	<"ä½•ã‹ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ä¸‹ã•ã„ ">
 ;
 	defb	0		;End of table
+
+	.strenc default
 ;
 ;
 ;-----------------------------------------------------------------------------

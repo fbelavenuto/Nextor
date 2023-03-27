@@ -1,10 +1,11 @@
 	.z80
+	name('char')
 	title	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	subttl	CP/M character Functions
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------

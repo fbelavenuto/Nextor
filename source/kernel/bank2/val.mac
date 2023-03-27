@@ -1,10 +1,11 @@
 	.z80
+	name('val')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Validate Disk and Interface to Disk Drivers
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 
 MBR_PSTART	equ	01BEh	;Start of partition table in MBR
@@ -142,8 +143,8 @@ new_boot_sec:	push	af
 		call	FIND_UPB
 		ld	de,1			;Try to read the first FAT
 		jr	nz,upb_no_valid
-		ld	e,(ix+UPB_RES##)
-		ld	d,(ix+UPB_RES##+1)
+		ld	e,(ix+UPB_RESERVED_SECTORS##)
+		ld	d,(ix+UPB_RESERVED_SECTORS##+1)
 upb_no_valid:
 		ld	bc,(DATA_SEG##)		; sector and if there was
 		ld	b,1			; any error then give up
@@ -189,7 +190,7 @@ got_boot_sec:	push	hl
 		call	SET_RANDOM_VOLID	; Write new volume id even if there is already one,
 						; for compatibility with previous DOS version
 		ld	hl,UPB_BUF##+NEW_BOOT_SZ+1Eh
-		ld	de,512-NEW_BOOT_SZ-1Eh	;UPB_BOOT##+NEW_BOOT_SZ-256
+		ld	de,512-NEW_BOOT_SZ-1Eh	;UPB_BOOT_CODE##+NEW_BOOT_SZ-256
 		ld	b,0
 zero_old_upb:	ld	(hl),b			;Zero the rest of the boot
 		inc	hl			; sector to keep things
@@ -276,11 +277,11 @@ do_quick_format:
 		ld	bc,512-1
 		ldir
 
-		ld	e,(ix+UD_RES##)
-		ld	d,(ix+UD_RES##+1)	;DE = First FAT sector
+		ld	e,(ix+UD_RESERVED_SECTORS##)
+		ld	d,(ix+UD_RESERVED_SECTORS##+1)	;DE = First FAT sector
 		xor	a			;Assume we will work exclusively
 		ld	(DIO_EX_SECTOR##),a	; on the first 32MB of the disk.
-		ld	b,(ix+UD_NFAT##)	;B = Number of FATs
+		ld	b,(ix+UD_NUMBER_OF_FATS##)	;B = Number of FATs
 
 		;--- Loop for all FATs
 
@@ -289,7 +290,7 @@ qf_fats_loop:	push	bc
 		;* Clear the first FAT sector
 
 		ld	hl,UPB_BUF##
-		ld	a,(ix+UD_MBYTE##)
+		ld	a,(ix+UD_MEDIA_DESC_BYTE##)
 		ld	(hl),a
 		inc	hl
 		ld	(hl),0FFh
@@ -310,7 +311,7 @@ qf_is_notfat16:
 
 		;* Clear other FAT sectors, if any
 
-		ld	a,(ix+UD_SFAT##)
+		ld	a,(ix+UD_SECTORS_PER_FAT##)
 		dec	a
 		jr	z,qf_okfat
 
@@ -325,10 +326,10 @@ qf_okfat:	pop	bc
 
 		;--- Now clear the root directory
 
-		ld	e,(ix+UD_SDIR##)	;DE = first directory sector
-		ld	d,(ix+UD_SDIR##+1)
-		ld	b,(ix+UD_WDS##)		;B = whole sectors for root directory
-		ld	a,(ix+UD_ODE##)
+		ld	e,(ix+UD_FIRST_ROOT_DIR_SECTOR##)	;DE = first directory sector
+		ld	d,(ix+UD_FIRST_ROOT_DIR_SECTOR##+1)
+		ld	b,(ix+UD_WHOLE_DIR_SECTORS##)		;B = whole sectors for root directory
+		ld	a,(ix+UD_ODD_DIR_ENTRIES##)
 		or	a
 		jr	z,qf_no_ode
 		inc	b
@@ -400,10 +401,10 @@ SET_BOOT_EX:
 		call	GET_VOLID
 		ld	a,b
 		dec	a
-		ld	hl,UPB_BUF##+UPB_DIRT##
+		ld	hl,UPB_BUF##+UPB_DIRTY_FLAG##
 		jr	z,set_boot_ex_end
 		ld	hl,NEW_BOOT
-		ld	de,UPB_BUF##+UPB_BOOT##
+		ld	de,UPB_BUF##+UPB_BOOT_CODE##
 		ld	bc,NEW_BOOT_SZ
 		ldir
 		pop	hl
@@ -418,25 +419,25 @@ set_boot_ex_std:
 		call	GET_VOLID
 		ld	a,b
 		cp	2
-		ld	hl,UPB_BUF##+UPB_RSV##
+		ld	hl,UPB_BUF##+UPB_RESERVED##
 		jr	z,set_boot_ex_end
 		ld	hl,NEW_BOOT_STD
-		ld	de,UPB_BUF##+UPB_PHY##
+		ld	de,UPB_BUF##+UPB_PHYSICAL_DRIVE##
 		ld	bc,NEW_STDBOOT_SZ
 		ldir
 
 		ld	ix,UPB_BUF##		;Set big sector count to zero
-		ld	a,(ix+UPB_SEC##)	;if small sector count is not zero
-		or	(ix+UPB_SEC##+1)
+		ld	a,(ix+UPB_TOTAL_SECTORS##)	;if small sector count is not zero
+		or	(ix+UPB_TOTAL_SECTORS##+1)
 		jr	z,set_boot_ex_bigs
-		ld	(ix+UPB_BIGSEC##),0
-		ld	(ix+UPB_BIGSEC##+1),0
-		ld	(ix+UPB_BIGSEC##+2),0
-		ld	(ix+UPB_BIGSEC##+3),0
+		ld	(ix+UPB_BIG_TOTAL_SECTORS##),0
+		ld	(ix+UPB_BIG_TOTAL_SECTORS##+1),0
+		ld	(ix+UPB_BIG_TOTAL_SECTORS##+2),0
+		ld	(ix+UPB_BIG_TOTAL_SECTORS##+3),0
 set_boot_ex_bigs:
 
-		ld	(ix+UPB_BOOT##),0	;Clear old DOS1 jump, if any
-		ld	(ix+UPB_BOOT##+1),0
+		ld	(ix+UPB_BOOT_CODE##),0	;Clear old DOS1 jump, if any
+		ld	(ix+UPB_BOOT_CODE##+1),0
 
 		pop	hl
 		ld	bc,UD_FLAGS##
@@ -444,7 +445,7 @@ set_boot_ex_bigs:
 		bit	UF_F16,(hl)
 		ld	a,"2"
 		jr	nz,fatmark_ok
-		ld	(UPB_BUF##+UPB_FILESYS##+4),a	;Set "FAT12" mark if necessary
+		ld	(UPB_BUF##+UPB_FILESYSTEM##+4),a	;Set "FAT12" mark if necessary
 fatmark_ok:
 		or	a
 		ret
@@ -472,8 +473,8 @@ SET_RANDOM_VOLID:
 		srl	b
 		rla
 		ld	c,a
-		ld	(UPB_BUF##+UPB_ID##),hl   ;Store this as the volume-id
-		ld	(UPB_BUF##+UPB_ID##+2),bc ; in the boot sector.
+		ld	(UPB_BUF##+UPB_RANDOM_ID##),hl   ;Store this as the volume-id
+		ld	(UPB_BUF##+UPB_RANDOM_ID##+2),bc ; in the boot sector.
 		ret
 
 ;		------------------------------------
@@ -597,7 +598,7 @@ NEW_BOOT_SZ	equ	$-NEW_BOOT
 ;	        HL -> Unit descriptor for this unit (if A=0)
 ; Corrupts:   AF,BC,DE,HL,PAGE1
 ;
-; Assumes:    UD_ID > UD_TIME
+; Assumes:    UD_VOLUME_ID > UD_TIME
 ;
 ; Note: the flag returned by BUILD_UPB is not checked when B=1,
 ; since this flag only makes sense when invoked from F_RDDRV/F_WRDRV,
@@ -643,7 +644,7 @@ valfib2:
 
 wfile_loop:	push	ix
 		pop	hl			;DE -> required volume-id
-		ld	bc,FIB_ID##		;      in the FIB.
+		ld	bc,FIB_VOLUME_ID##		;      in the FIB.
 		add	hl,bc
 		ex	de,hl
 ;
@@ -659,7 +660,7 @@ wfile_loop:	push	ix
 		or	a			; UPB for this unit.
 		jr	z,no_cur_upb
 ;
-		ld	c,UD_ID##-UD_TIME##	;HL -> current volume-id in
+		ld	c,UD_VOLUME_ID##-UD_TIME##	;HL -> current volume-id in
 		add	hl,bc			;      unit descriptor.
 		ld	c,a			;C := media check timeout
 ;
@@ -782,10 +783,10 @@ got_old_volid:
 		push	de			;DE -> FIB
 		push	hl
 ;
-		ld	bc,UD_ID##
+		ld	bc,UD_VOLUME_ID##
 		add	hl,bc
 		ex	de,hl			;Copy the four byte volume-id
-		ld	c,FIB_ID##		; from the unit descriptor
+		ld	c,FIB_VOLUME_ID##		; from the unit descriptor
 		add	hl,bc			; into the FIB.
 		ex	de,hl
 		ld	c,4
@@ -845,7 +846,7 @@ CHECK_MNT:
 ; done  internally  by  the  "BUILD_UPB"  routine.  It first calls VAL_SAME to
 ; ensure that the correct disk is in the drive and then  does  the  operation.
 ; Any  error  from  the operation will be returned to the caller.  The UD_TIME
-; field will be set to UD_TMOUT to start the MEDIA CHECK timeout going again.
+; field will be set to UD_MEDIA_CHECK_TIMEOUT to start the MEDIA CHECK timeout going again.
 ;
 ; Entry:        HL = Address of unit descriptor
 ;		 A = Command code (RD_CMD or WR_CMD)
@@ -864,7 +865,7 @@ SET_TIMEOUT:	push	hl			;Set media check timeout to
 		call	UD_TICK			;Make UD_TIME up to date.
 
 		ex	(sp),ix			; maximum value since unit
-		ld	(ix+UD_TIME##),UD_TMOUT##; has just been accessed.  If
+		ld	(ix+UD_TIME##),UD_MEDIA_CHECK_TIMEOUT##; has just been accessed.  If
 		ex	(sp),ix			; DISK_ERR is called then this
 		pop	hl			; will be set back to 1.
 ;
@@ -892,7 +893,7 @@ VAL_SAME:
 ; Returns:    None
 ; Corrupts:   None
 ;
-; Assumes:    UD_MBYTE=UD_ID+4
+; Assumes:    UD_MEDIA_DESC_BYTE=UD_VOLUME_ID+4
 ;
 ;
 		push	af
@@ -1099,7 +1100,7 @@ TEST_SAME_DISK:
 ;		 IX -> UPB as read in by BUILD_UPB
 ; Returns:   Z-flag -  Set (Z) => volid and media byte are the same
 ;		       Clear (NZ) => volid or media byte are different
-;		 DE -> UD_ID+4 (only if Z-flag set)
+;		 DE -> UD_VOLUME_ID+4 (only if Z-flag set)
 ; Corrupts:   AF,BC,DE
 ;
 ;
@@ -1109,12 +1110,12 @@ TEST_SAME_DISK:
 		pop	hl
 ;
 		push	hl			;Now compare volume-id with
-		ld	bc,UD_ID##		; the current one for this
+		ld	bc,UD_VOLUME_ID##		; the current one for this
 		add	hl,bc			; unit
 		call	CP_VOLID
 		jr	nz,pop_hl_ret		;Jump if volume-id different
 		ld	a,(hl)
-		cp	(ix+UPB_MBYTE##)
+		cp	(ix+UPB_MEDIA_DESC_BYTE##)
 pop_hl_ret:	pop	hl			; then assume it is same disk.
 		ret
 ;
@@ -1136,12 +1137,12 @@ GET_VOLID:
 ;                  2: standard boot sector
 ; Corrupts:   AF,B,DE,HL
 ;
-; Assumes:    UPB_DIRT=UPB_VOLID+6     UPB_ID=UPB_DIRT+1
+; Assumes:    UPB_DIRTY_FLAG=UPB_VOLUME_ID+6     UPB_RANDOM_ID=UPB_DIRTY_FLAG+1
 ;
 ;
 		push	ix
 		pop	hl
-		ld	de,UPB_VOLID##
+		ld	de,UPB_VOLUME_ID##
 		add	hl,de
 		ld	de,vid_str
 		ld	b,6
@@ -1149,14 +1150,14 @@ GET_VOLID:
 		ld	b,1
 		jr	z,ok_volid
 
-		ld	a,(ix+UPB_EBS##)
+		ld	a,(ix+UPB_EXTENDED_SIGNATURE##)
 		and	28h		;Test for EBS signature (standard disk)
 		cp	28h
 		jr	nz,no_volid
 
 		push	ix
 		pop	hl
-		ld	de,UPB_FILESYS##
+		ld	de,UPB_FILESYSTEM##
 		add	hl,de
 		ld	de,fat_str
 		ld	b,4
@@ -1168,7 +1169,7 @@ GET_VOLID:
 
 ok_volid:	push	ix
 		pop	hl
-		ld	de,UPB_ID##
+		ld	de,UPB_RANDOM_ID##
 		add	hl,de
 		xor	a
 		ret
@@ -1240,9 +1241,9 @@ DO_MEDIA_CHANGE:
 	push	iy
 
 	ld	b,(ix+UD_SLOT##)
-	ld	c,(ix+UD_SEG##)
-	ld	d,(ix+UD_DI##)
-	ld	e,(ix+UD_LI##)
+	ld	c,(ix+UD_RAM_SEGMENT##)
+	ld	d,(ix+UD_DEVICE_INDEX##)
+	ld	e,(ix+UD_LUN_INDEX##)
 	ld	ix,UNMAPALL##
 	call CALL4_PRESERVE_ALT
 
@@ -1312,10 +1313,10 @@ bupc:
 
 		bit	UF_FOK,(ix+UD_DFLAGS##)
 		jr	nz,build_upb_okfsec
-		ld	(ix+UD_FSEC##),0	;Start by reading the MBR
-		ld	(ix+UD_FSEC##+1),0	;(for device-based drivers only)
-		ld	(ix+UD_FSEC##+2),0
-		ld	(ix+UD_FSEC##+3),0
+		ld	(ix+UD_FIRST_DEVICE_SECTOR##),0	;Start by reading the MBR
+		ld	(ix+UD_FIRST_DEVICE_SECTOR##+1),0	;(for device-based drivers only)
+		ld	(ix+UD_FIRST_DEVICE_SECTOR##+2),0
+		ld	(ix+UD_FIRST_DEVICE_SECTOR##+3),0
 build_upb_okfsec:
 
 		pop		af
@@ -1337,7 +1338,7 @@ try_build_upb:	ld	de,0			;Try to read the boot sector
 
 		push	hl
 ;
-		;If device-based driver, and UD_FSEC not valid,
+		;If device-based driver, and UD_FIRST_DEVICE_SECTOR not valid,
 		;find the first available FAT12 or FAT16 partition
 
 		ex	(sp),ix
@@ -1349,8 +1350,8 @@ try_build_upb:	ld	de,0			;Try to read the boot sector
 
 build_upb_do_findpart:
         ex	(sp),ix
-        ld b,(ix+UD_DI##)
-        ld c,(ix+UD_LI##)
+        ld b,(ix+UD_DEVICE_INDEX##)
+        ld c,(ix+UD_LUN_INDEX##)
         ex	(sp),ix
 
         pop hl
@@ -1454,7 +1455,7 @@ FIND_UPB:
 ;
 		push	ix
 		ex	(sp),hl
-		ld	de,UPB_SSZ##
+		ld	de,UPB_SECTOR_SIZE##
 		add	hl,de
 		ld	d,(hl)			;Sector size must always
 		inc	hl			; be 200h.
@@ -1489,7 +1490,7 @@ FIND_UPB:
 		or	(hl)
 		jr	z,upb_not_found
 
-		ld	de,UPB_SFAT##-(UPB_NDIR##+1);Ignore "total sectors"
+		ld	de,UPB_SECTORS_PER_FAT##-(UPB_NUM_ROOT_DIR_ENTRIES##+1);Ignore "total sectors"
 		add	hl,de			;  and "media byte".
 
 		ld	e,(hl)			;Number of sectors per
@@ -1505,7 +1506,7 @@ FIND_UPB:
 
 		pop	hl	;Here, IX=boot sector, HL=unit desc
 		jr	nz,MKDPB_DEVBASED
-		ld	b,(ix+UPB_MBYTE##)
+		ld	b,(ix+UPB_MEDIA_DESC_BYTE##)
 		ld	a,DP_CMD
 		call	CALL_UNIT
 		ret				; if UPB was OK.
@@ -1527,8 +1528,8 @@ MKDPB_DEVBASED:
 		push	ix
 		ex	(sp),hl
 		pop	ix
-		ld	e,(ix+UD_DPB##)
-		ld	d,(ix+UD_DPB##+1)
+		ld	e,(ix+UD_DPB_ADDRESS##)
+		ld	d,(ix+UD_DPB_ADDRESS##+1)
 		inc	de
 
         ld ix,MKDPB##
@@ -1564,7 +1565,7 @@ MAKE_UPB:
 		ret	nz			; not supported.
 ;
 		push	hl
-		ld	de,UD_DPB##
+		ld	de,UD_DPB_ADDRESS##
 		add	hl,de
 		ld	e,(hl)			;DE -> address of DPB
 		inc	hl
@@ -1573,7 +1574,7 @@ MAKE_UPB:
 		ex	(sp),ix			;IX -> address of DPB
 		pop	hl			;HL -> buffer
 		push	hl
-		ld	de,UPB_SSZ##
+		ld	de,UPB_SECTOR_SIZE##
 		add	hl,de			;Start from UPB.
 ;
 		ld	c,(ix+2)		;Get sector size.
@@ -1659,10 +1660,10 @@ secsize_loop:	add	hl,hl
 ; Returns:      None
 ; Corrupts:     AF,BC,DE
 ;
-; Assumes:      UPB_DIRT=UPB_VOLID+6       UPB_ID=UPB_DIRT+1
-;		  (UD_CMSK, UD_CSHFT, UD_RES, UD_NFAT, UD_ODE, UD_WDS
-;		   UD_SFAT, UD_SDIR, UD_SDAT, UD_NCLU, UD_DIRT, UD_ID,
-;		   and UD_MBYTE) must all be sequential.
+; Assumes:      UPB_DIRTY_FLAG=UPB_VOLUME_ID+6       UPB_RANDOM_ID=UPB_DIRTY_FLAG+1
+;		  (UD_CLUSTER_MASK, UD_CLUSTER_SHIFT, UD_RESERVED_SECTORS, UD_NUMBER_OF_FATS, UD_ODD_DIR_ENTRIES, UD_WHOLE_DIR_SECTORS
+;		   UD_SECTORS_PER_FAT, UD_FIRST_ROOT_DIR_SECTOR, UD_FIRST_DATA_SECTOR, UD_CLUSTER_COUNT, UD_DIRTY_DISK_FLAG, UD_VOLUME_ID,
+;		   and UD_MEDIA_DESC_BYTE) must all be sequential.
 ;
 ;
 		call	_NEW_UPB
@@ -1710,10 +1711,10 @@ _NEW_UPB:
 		or	UFM_F2
 		ld	(hl),a		;Assume first a FAT12 drive
 
-		ld	bc,UD_CMSK##-UD_FLAGS##
+		ld	bc,UD_CLUSTER_MASK##-UD_FLAGS##
 		add	hl,bc
 ;
-		ld	a,(ix+UPB_CS##)		;Set CLUSTER MASK to:
+		ld	a,(ix+UPB_SECTORS_PER_CLUSTER##)		;Set CLUSTER MASK to:
 		dec	a			; (sectors per cluster) - 1.
 		ld	(hl),a
 		inc	hl
@@ -1725,23 +1726,23 @@ cshft_loop:	inc	c			;Set CLUSTER SHIFT to:
 		ld	(hl),c
 		inc	hl
 ;
-		ld	e,(ix+UPB_RES##)
+		ld	e,(ix+UPB_RESERVED_SECTORS##)
 		ld	(hl),e			;Copy RESERVED SECTORS straight
 		inc	hl			; from UPB to unit descriptor.
-		ld	d,(ix+UPB_RES##+1)
+		ld	d,(ix+UPB_RESERVED_SECTORS##+1)
 		ld	(hl),d
 		inc	hl
 		push	de
 ;
-		ld	b,(ix+UPB_NFAT##)	;Copy NUMBER OF FATs straight
+		ld	b,(ix+UPB_NUM_FATS##)	;Copy NUMBER OF FATs straight
 		ld	(hl),b			; from UPB to unit descriptor.
 		inc	hl
 ;
-		ld	e,(ix+UPB_NDIR##)	;Get number of root directory
-		ld	d,(ix+UPB_NDIR##+1)	; entries from UPB.
+		ld	e,(ix+UPB_NUM_ROOT_DIR_ENTRIES##)	;Get number of root directory
+		ld	d,(ix+UPB_NUM_ROOT_DIR_ENTRIES##+1)	; entries from UPB.
 ;
 		ld	a,e			;Set ODD DIRECTORY ENTRIES
-		and	512/32-1		; (UD_ODE) to the number of
+		and	512/32-1		; (UD_ODD_DIR_ENTRIES) to the number of
 		ld	(hl),a			; entries in the last directory
 						; sector (0...0Fh)
 ;
@@ -1751,7 +1752,7 @@ dir_sec_loop:	srl	d			; entries by 16 to get number
 		dec	a
 		jr	nz,dir_sec_loop
 		cp	(hl)			;Set carry if there is a
-		inc	hl			; partial sector (UD_ODE<>0).
+		inc	hl			; partial sector (UD_ODD_DIR_ENTRIES<>0).
 		ld	(hl),e			;Record WHOLE DIRECTORY SECTORS
 		inc	hl			; in unit descriptor
 ;
@@ -1759,7 +1760,7 @@ dir_sec_loop:	srl	d			; entries by 16 to get number
 		inc	de			; then count one extra sector
 no_partial_sec:					; reserved for directory.
 
-		ld	a,(ix+UPB_SFAT##)	;Copy SECTORS PER FAT straight
+		ld	a,(ix+UPB_SECTORS_PER_FAT##)	;Copy SECTORS PER FAT straight
 		ld	(hl),a			; from UPB to unit descriptor.
 		inc	hl
 ;
@@ -1796,15 +1797,15 @@ sfat_no_cy:	djnz	sfat_loop
 		inc	hl
 ;
 		push	hl
-		ld	l,(ix+UPB_SEC##)	;Get total number of sectors
-		ld	h,(ix+UPB_SEC##+1)
+		ld	l,(ix+UPB_TOTAL_SECTORS##)	;Get total number of sectors
+		ld	h,(ix+UPB_TOTAL_SECTORS##+1)
 		ld	a,l
 		or	h
 		ld	a,0
 		jr	nz,nclu_fat12
-		ld	l,(ix+UPB_BIGSEC##)	;Get total number of sectors (23bit)
-		ld	h,(ix+UPB_BIGSEC##+1)
-		ld	a,(ix+UPB_BIGSEC##+2)
+		ld	l,(ix+UPB_BIG_TOTAL_SECTORS##)	;Get total number of sectors (23bit)
+		ld	h,(ix+UPB_BIG_TOTAL_SECTORS##+1)
+		ld	a,(ix+UPB_BIG_TOTAL_SECTORS##+2)
 nclu_fat12:	sbc	hl,de			;HL := (data sectors)
 		sbc	a,0
 
@@ -1850,7 +1851,7 @@ nclu_done:
 		push	de
 		push	ix
 		pop	hl
-		ld	de,UPB_FILESYS##
+		ld	de,UPB_FILESYSTEM##
 		add	hl,de
 		ld	de,FAT16_S
 		ld	b,5
@@ -1902,9 +1903,18 @@ upb_dos220:
 		ldir
 		ex	de,hl
 ;
-		ld	a,(ix+UPB_MBYTE##)	;Copy MEDIA DESCRIPTOR BYTE
+		ld	a,(ix+UPB_MEDIA_DESC_BYTE##)	;Copy MEDIA DESCRIPTOR BYTE
 						; from UPB to unit descriptor
-new_upb_fat12:	ld	(hl),a
+        ld	(hl),a
+
+		pop hl
+		push hl
+		ld bc,UD_ALLOCATION_CLUSTER##
+		add hl,bc  
+		ld (hl),1     ;Initialize next cluster to check for allocation to 2
+		inc hl        ;(it's stored as value-1)
+		ld (hl),0
+
 		pop	hl
 
 		;--- If drive is FAT16, calculate reduced cluster count
@@ -1917,10 +1927,10 @@ new_upb_fat12:	ld	(hl),a
 		bit	UF_F16,(ix+UD_FLAGS##)
 		jr	z,reduce_end
 
-		ld	e,(ix+UD_NCLU##)
-		ld	d,(ix+UD_NCLU##+1)
+		ld	e,(ix+UD_CLUSTER_COUNT##)
+		ld	d,(ix+UD_CLUSTER_COUNT##+1)
 		dec	de		;DE=Actual cluster count
-		ld	a,(ix+UD_CMSK##)
+		ld	a,(ix+UD_CLUSTER_MASK##)
 		ld	h,80h		;Start by assuming 32768 clusters...
 		srl	a		;...and 2 sectors/cluster...
 reduce_clus_lp:
@@ -1941,26 +1951,26 @@ end_reduce_clus:
 		jr	nc,reduce_set		;cluster count and actual count.
 		ex	de,hl
 reduce_set:
-		ld	(ix+UD_RDCLUS##),e	
-		ld	(ix+UD_RDCLUS##+1),d
+		ld	(ix+UD_REDUCED_CLUSTER_COUNT##),e	
+		ld	(ix+UD_REDUCED_CLUSTER_COUNT##+1),d
 
 		;--- Set the reduced allocation information mode flag
 		;    if necessary
 
-		ld	b,(ix+UD_PHYS##)
+		ld	b,(ix+UD_PHYSICAL_UNIT##)
 
 		;*** NOTE: M80 gives a R error on "if MAX_UNITS" lines
 		;          and compiles always the else clause.
 		;          Solve this if MAX_UNITS needs to grow over 8.
 
-;if MAX_UNITS## GT 8
+;if MAX_UNITS GT 8
 ;		ld	hl,(RALL_VECT##)
 ;else
 		ld	a,(RALL_VECT##)
 ;endif
 
 reduce_bit_loop:
-;if MAX_UNITS## GT 8
+;if MAX_UNITS GT 8
 ;		srl	h
 ;		rr	l
 ;else
@@ -1994,7 +2004,7 @@ z80mode_done:
 
 ;
 ; Build MSX DPB from unit descriptor.
-; Assumes:  UD_DPB=2, ...etc.
+; Assumes:  UD_DPB_ADDRESS=2, ...etc.
 ;
 		push	hl
 		inc	hl
@@ -2015,11 +2025,11 @@ z80mode_done:
 		ld	(hl),4
 		inc	hl
 		ex	de,hl
-		ld	bc,UD_CMSK##-UD_DPB##-1	;Copy down
-		add	hl,bc			; UD_CMSK, UD_CSHFT,
-		ld	bc,1+1+2+1		; UD_RES and UD_NFAT.
+		ld	bc,UD_CLUSTER_MASK##-UD_DPB_ADDRESS##-1	;Copy down
+		add	hl,bc			; UD_CLUSTER_MASK, UD_CLUSTER_SHIFT,
+		ld	bc,1+1+2+1		; UD_RESERVED_SECTORS and UD_NUMBER_OF_FATS.
 		ldir
-		ld	c,(hl)			;Get UD_ODE and UD_WDS
+		ld	c,(hl)			;Get UD_ODD_DIR_ENTRIES and UD_WHOLE_DIR_SECTORS
 		inc	hl
 		ld	a,(hl)			;Calc number of directory
 		inc	hl			; entries.
@@ -2030,14 +2040,14 @@ z80mode_done:
 		or	c
 		ld	(de),a			;Store low byte
 		inc	de
-		push	hl			;Save pointer to UD_SFAT
+		push	hl			;Save pointer to UD_SECTORS_PER_FAT
 		inc	hl
 		inc	hl
 		inc	hl
-		ld	bc,2+2			;Copy down UD_SDAT and UD_NCLU
+		ld	bc,2+2			;Copy down UD_FIRST_DATA_SECTOR and UD_CLUSTER_COUNT
 		ldir
 		pop	hl
-		ld	bc,1+2			;Copy down UD_SFAT and UD_SDIR
+		ld	bc,1+2			;Copy down UD_SECTORS_PER_FAT and UD_FIRST_ROOT_DIR_SECTOR
 		ldir
 		pop	hl
 ;
@@ -2046,7 +2056,7 @@ z80mode_done:
 ;
 		push	hl
 		push	bc
-		ld	bc,UD_CDIR##
+		ld	bc,UD_CURRENT_DIR_FIRST_CLUSTER##
 		add	hl,bc			;Look at current dir cluster
 		pop	bc
 		ld	a,(hl)
@@ -2132,10 +2142,16 @@ CALL_UNIT:
 		cp	number_of_cmds		;Reject if command code is
 		jp	nc,bad_unit_cmd		; not a sensible value.
 ;
-		push	iy
+		push hl
+		push hl
+		ex (sp),iy
+		call CALLUNIT2
+		pop iy
+		pop hl
+		ret
+CALLUNIT2:
+
 		push	af
-		push	hl
-		pop	iy
 		ld	a,(iy+UD_FLAGS##)
 		and	UFM_MT
 		jp	z,CUN_NO_MOUNT
@@ -2150,7 +2166,6 @@ CALL_UNIT:
 
 		;* Treat non-read or write commands
 
-		pop	iy
 		ld	c,a
 
 		cp	MC_CMD	;Check media change: return never changed
@@ -2173,116 +2188,30 @@ CALL_UNIT:
 		;* It is a read or write command
 
 CUN_RW:
-		push	af
-		ld	a,c
-		ld	(SEG_SAVE##),a	;Required segment
-
-		pop	af
-		pop	iy
-		ld	(IY_SAVE##),iy
-
-		push	hl
-		push	ix
-
-		push	hl
-		pop	iy
-
-		push	ix
-		pop	hl
-
-		ex	af,af'
-		push	af
-		ex	af,af'
 		exx
-		push	hl
-		push	de
-		push	bc
+		push hl
+		push bc
 		exx
-		push	bc
+		call _CUN_RW
 		exx
-		ld de,(RW_PSEC##)
-		push de
-		ld de,(RW_DTA##)
-		push de
+		pop bc
+		pop hl
 		exx
-		call	CUN_RW2
-		exx
-		pop de
-		ld (RW_DTA##),de
-		pop de
-		ld (RW_PSEC##),de
-		exx
-		pop	bc
-		exx
-		pop	bc
-		pop	de
-		pop	hl
-		exx
-		ex	af,af'
-		pop	af
-		ex	af,af'
-
-		ld	iy,(IY_SAVE##)
-		pop	ix
-		pop	hl
-		or	a
-		ret	z
-		ld	b,0	;Needed in case of error
 		ret
+_CUN_RW:
 
-CUN_RW2:
-		ld	c,a
+		push	af
 
-		;>>> C = Command (RD_CMD or WR_CMD), 
+		;>>> A = Command (RD_CMD or WR_CMD), 
 		;    B = sector count
 		;    DE = First sector
-		;    HL = Destination
 		;    IY = Unit descriptor
-
-		;* Convert destination address according to the required segment
-		;  (the reverse of what GET_SEGMENT does) if it is a TPA segment.
-		;  This is necessary to prevent the actual sector access
-		;  (for the unit that host the image file) to target the wrong segment.
-
-		push	de
-		push	bc
-		push	hl
-
-		ld	a,(SEG_SAVE##)
-		ld	c,a
-		ld	b,4
-		ld	d,0
-		ld	hl,P0_TPA##
-xxx:
-		ld	a,(hl)
-		cp	c
-		jr	z,xxx2
-		ld	a,d
-		add	a,40h
-		ld	d,a
-		inc	hl
-		djnz	xxx
-		jr	xxx3
-
-xxx2:
-		pop	hl
-		ld	a,h
-		and	00111111b
-		or	d
-		ld	h,a
-		jr	xxx4
-xxx3:
-		pop	hl
-xxx4:
-		pop	bc
-		pop	de
 
 		;* Check sector number
 
 		ld	a,(DIO_EX_SECTOR##)
 		or	a
-		ld	a,.RNF##
-		ret	nz
+		jp	nz,RET_RNF_POP
 
 		push	de
 		push	bc
@@ -2293,102 +2222,56 @@ xxx4:
 		ld	b,0
 		add	hl,bc
 		dec	hl	;HL = Last sector to access
-		ld	a,(iy+UD_MXS##+1)
+		ld	a,(iy+UD_MOUNT_MAX_SECTOR##+1)
 		cp	h
-		ld	a,.RNF##
-		ret	c
+		jp	c,RET_EXX_RNF_POP
 		jr	nz,CUN_OKSEC
-		ld	a,(iy+UD_MXS##)
+		ld	a,(iy+UD_MOUNT_MAX_SECTOR##)
 		cp	l
-		ld	a,.RNF##
-		ret	c
+		jp	c,RET_EXX_RNF_POP
 CUN_OKSEC:
 		exx
 
-		;* Calculate FAB address from pseudo-file handle number
+		;* If it's a write command, check the readonly flag
 
-		push	bc
-		ld	b,(iy+UD_FH##)
-		ld	ix,MHANDLES##
-		ld	c,b
-		ld	b,0
-		add	ix,bc
-		add	ix,bc
-		ld	c,(ix)
-		ld	b,(ix+1)
-		push	bc
-		pop	ix
-
-		;* Perform a seek to sector number * 512
-
-		push	hl
-		xor	a
-		ld	h,e
-		ld	e,d
-		ld	l,0
-		ld	d,0	;Now DE:HL = DE * 256...
-		sla	h
-		rl	e
-		rl	d	;...and we multiply DE:HL by 2.
-		ld	(ix+FAB_PTR##),l
-		ld	(ix+FAB_PTR##+1),h
-		ld	(ix+FAB_PTR##+2),e
-		ld	(ix+FAB_PTR##+3),d
-		
-		pop	hl
-		pop	bc
-		or	a
-		ret	nz	;TODO: Convert to "disk error"?
-
-		;* Now perform the read or write!
-
-		ex	de,hl	;DE = transfer address
-		ld	h,b
-		ld	l,0
-		sla	h		;H = sectors * 512 = bytes to transfer
-
-		ld	a,(DATA_SEG##)
-		ld	b,a
-		ld	a,(SEG_SAVE##)
-		cp	b
-		ld	a,0FFh
-		jr	z,ASDFG
-		inc	a
-	ASDFG:
-		ld	b,a
-
-		ld	iy,(IY_SAVE##)
-		push	ix
-		
-		push	hl
-		ld	a,c
+		pop af
+		push af
 		cp	WR_CMD
-		ld	a,b		;0 for TPA, FFh for current segment
-		pop	bc
-		jr	z,CUN_WRITE
-CUN_READ:
-		PCALL	RD_FAB
-		jr	CUN_NEXT
-CUN_WRITE:
-		PCALL	WR_FAB	;@3AAB
-CUN_NEXT:
-		pop	ix
+		jr nz,CUN_OKWP
+		bit 0,(iy+UD_MOUNT_FLAGS##)	;Mounted as read only?
+		jp nz,RET_WP_POP
+CUN_OKWP:
 
-		cp	.ACCV##
-		jr	nz,CUN_NOACCV
-		ld	a,.WPROT##
-CUN_NOACCV:
+		;* Convert unit descriptor and sector number to those of the mounted file
 
-		ld	iy,(IY_SAVE##)
-		or	a
-		ret
+		push de
+
+		ld e,(iy+UD_MOUNT_DRIVE##)
+		sla e
+		ld d,0
+		ld	hl,UNIT_TAB##+2
+		add hl,de
+		ld	e,(hl)
+		inc	hl
+		ld	d,(hl)	
+		ex de,hl  ;HL=Address of unit descriptor for the drive of the mounted file
+
+		ex (sp),hl	;HL=Sector number, address of unit descriptor in stack
+		ld e,(iy+UD_MOUNT_FIRST_DRIVE_SECTOR##)
+		ld d,(iy+UD_MOUNT_FIRST_DRIVE_SECTOR##+1)
+		add hl,de
+		ld a,0
+		adc a,(iy+UD_MOUNT_FIRST_DRIVE_SECTOR##+2)
+		ld (DIO_EX_SECTOR##),a
+		ex de,hl 	;DE=Updated sector number
+
+		pop hl
 
 		;--- Regular unit (not mounted)
+		;    or mounted unit after unit descriptor and sector number conversion
 
 CUN_NO_MOUNT:
 		pop	af
-		;push	iy
-		push	hl
 		push	hl			;Save lots of registers and
 		ex	(sp),ix			; get IX (DTA address) into
 		pop	hl			; HL and unit descriptor
@@ -2400,10 +2283,10 @@ CUN_NO_MOUNT:
 		ex	af,af'
 		push	af
 ;
-		ld	a,(ix+UD_PHYS##)	;Record target drive number
+		ld	a,(ix+UD_PHYSICAL_UNIT##)	;Record target drive number
 		dec	a			; for "prompt" routine.
 		ld	(TARGET##),a
-		ld	a,(ix+UD_REL##)		;Get relative unit number
+		ld	a,(ix+UD_RELATIVE_UNIT_NUMBER##)		;Get relative unit number
 		ex	af,af'			; into A' for disk driver.
 		ld	c,a			;C := command code
 ;
@@ -2440,8 +2323,7 @@ call_unit_drvbased:
 		pop	hl
 		exx
 		pop	ix
-		pop	hl
-		pop	iy
+
 ;
 		or	a			;Return from CALL_UNIT with
 		ret				; flags set according to error.
@@ -2449,6 +2331,20 @@ call_unit_drvbased:
 ;
 bad_unit_cmd:	ld	a,.INTER##		;Return error if command code
 		or	a			; is not sensible.
+		ret
+
+RET_EXX_RNF_POP:
+		exx
+RET_RNF_POP:
+		pop af
+		ld a,.RNF##
+		or a
+		ret
+
+RET_WP_POP:
+		pop af
+		ld a,.WPROT##
+		or a
 		ret
 ;
 jp_hl:		jp	(hl)
@@ -2493,7 +2389,7 @@ rd_wr_cmd:	ex	af,af'			;Put unit number in A'
 		ld	a,c			;A := page-2 segment
 		push	af
 		bit	UF_F16,(ix+UD_FLAGS##)	;Check FAT16 flag
-		ld	a,(ix+UD_MBYTE##)
+		ld	a,(ix+UD_MEDIA_DESC_BYTE##)
 		jr	z,rd_wr_cmd_16bit_sec	;C := media descriptor byte
 		ld	a,(DIO_EX_SECTOR##)	;C := sector number (bit16-22)
 
@@ -2520,12 +2416,10 @@ mc_cmd_routine:	ex	af,af'			;Put unit number in A'
 		ld	hl,4003h		;DSKCHG is 2nd jump in table
 		exx
 		ld	b,0			;B := 0 initially
-		ld	c,(ix+UD_MBYTE##)	;C := media descriptor byte
+		ld	c,(ix+UD_MEDIA_DESC_BYTE##)	;C := media descriptor byte
 		set	7,c			;ignore FAT12 flag
-
-		ld	l,(ix+UD_DPB##)		;HL := DPB pointer
-		ld	h,(ix+UD_DPB##+1)
-
+		ld	l,(ix+UD_DPB_ADDRESS##)		;HL := DPB pointer
+		ld	h,(ix+UD_DPB_ADDRESS##+1)
 		call	CALL_DRV		;Call the disk driver
 		jr	c,mchk_cmd_err
 		xor	a			; A=0 and B=disk change
@@ -2540,12 +2434,10 @@ dp_cmd_routine:	ex	af,af'			;Put unit number in A'
 		ld	hl,4006h		;GETDPB is 3rd jump in table
 		exx
 						;B := FATid byte
-		ld	c,(ix+UD_MBYTE##)	;C := media descriptor byte
+		ld	c,(ix+UD_MEDIA_DESC_BYTE##)	;C := media descriptor byte
 		set	7,c			;ignore FAT12 flag
-
-		ld	l,(ix+UD_DPB##)		;HL := DPB pointer
-		ld	h,(ix+UD_DPB##+1)
-
+		ld	l,(ix+UD_DPB_ADDRESS##)		;HL := DPB pointer
+		ld	h,(ix+UD_DPB_ADDRESS##+1)
 		call	CALL_DRV		;Call the disk driver
 		ld	a,.NCOMP##		;Incompatible media if error
 		ret	c
@@ -2648,12 +2540,12 @@ rdwr_devcmd:
 	push	af	;Save read/write flag and required segment
 
 	push	hl
-	ld	l,(ix+UD_FSEC##)	;Calculate sector number
-	ld	h,(ix+UD_FSEC##+1)
+	ld	l,(ix+UD_FIRST_DEVICE_SECTOR##)	;Calculate sector number
+	ld	h,(ix+UD_FIRST_DEVICE_SECTOR##+1)
 	add	hl,de
 	ld	(TMP_SEC##),hl
-	ld	l,(ix+UD_FSEC##+2)
-	ld	h,(ix+UD_FSEC##+3)
+	ld	l,(ix+UD_FIRST_DEVICE_SECTOR##+2)
+	ld	h,(ix+UD_FIRST_DEVICE_SECTOR##+3)
 	ld	a,(DIO_EX_SECTOR##)
 	ld	e,a
 	ld	d,0
@@ -2665,10 +2557,10 @@ rdwr_devcmd:
 	ex	af,af'
 	pop	af		;Cy'=read/write flag
 	ld	c,a
-	ld	a,(ix+UD_DI##)	;A'=Device index
+	ld	a,(ix+UD_DEVICE_INDEX##)	;A'=Device index
 	ex	af,af'
 	ld	a,c		;A=Required segment
-	ld	c,(ix+UD_LI##)	;C=LUN index
+	ld	c,(ix+UD_LUN_INDEX##)	;C=LUN index
 
 	ld	de,TMP_SEC##
 	push	bc
@@ -2698,9 +2590,9 @@ mc_devcmd_remv:
 	exx
 
 	ex	af,af'
-	ld	a,(ix+UD_DI##)	;A'=Device index
+	ld	a,(ix+UD_DEVICE_INDEX##)	;A'=Device index
 	ex	af,af'
-	ld	b,(ix+UD_LI##)	;B=LUN index
+	ld	b,(ix+UD_LUN_INDEX##)	;B=LUN index
 	call	CALL_DRV
 	or	a
 	jr	z,mc_devcmd_err
@@ -2862,7 +2754,7 @@ CLDRV_RET_NOZ80:
 ; Corrupts:  AF,BC,DE,HL
 ;
 ;
-		ld	b,MAX_UNITS##
+		ld	b,MAX_UNITS
 zap_all_loop:	ld	a,b			;Get logical unit number
 		call	LG_TO_PHYS		;Get pointer to UNIT_TAB entry
 		ld	e,(hl)			; for this unit and see if it
@@ -2910,7 +2802,7 @@ no_zap_unit:	djnz	zap_all_loop		;Loop 'til done all units
 		ld	a,(CUR_DRV##)		; drive.
 not_default:
 		ld	c,.IDRV##		;Anticipate error code.
-		cp	MAX_UNITS##+1		;If unit number is too big
+		cp	MAX_UNITS+1		;If unit number is too big
 		jr	c,log_unit_ok		; then force it to zero.
 		xor	a
 log_unit_ok:
@@ -2985,7 +2877,7 @@ fat_not_invalid:
 		push	ix
 		ld	c,a
 		ld	hl,UNIT_TAB##+2		;Look through each entry
-		ld	b,MAX_UNITS##		; in UNIT_TAB in turn.
+		ld	b,MAX_UNITS		; in UNIT_TAB in turn.
 ud_tick_loop:	ld	e,(hl)
 		inc	hl
 		ld	d,(hl)
@@ -3050,7 +2942,7 @@ CALL4_PRESERVE_ALT:
     exx
 
 	ld	(BK4_ADD##),ix
-	ld	ix,?C4PBK##
+	ld	ix,C4PBK##
 	ld	iy,(MASTER_SLOT##-1)
 	call	CALSLT##
 

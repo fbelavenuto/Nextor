@@ -1,10 +1,11 @@
 	.z80
+	name('del')
 	TITLE	MSX-DOS KERNEL  Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Delete, Rename, Move, Attribute and Date/Time Routines
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -52,7 +53,7 @@
 		ret	nz			; for this same file.
 ;
 		push	hl			;Get the attributes byte from
-		ld	hl,DR_ATTR##		; the directory entry.
+		ld	hl,DR_ATTRIBUTES##		; the directory entry.
 		add	hl,de			;
 		ld	b,(hl)
 		pop	hl
@@ -89,7 +90,7 @@ dir_end:
 delete_file:	pcall	DI_SAME			;Ensure entry is still buffered
 		ld	a,c			;A := "DIRTY_DISK" flag
 		push	hl
-		ld	hl,DR_CLU##
+		ld	hl,DR_FIRST_CLUSTER##
 		add	hl,de
 		ld	c,(hl)			;BC := cluster number from
 		inc	hl			;      directory entry.
@@ -108,8 +109,8 @@ delete_file:	pcall	DI_SAME			;Ensure entry is still buffered
 						; into a buffer.
 ;
 		push	hl
-		ld	hl,DR_DCHAR##		;Save first character of the
-		add	hl,de			; entry in the DR_DCHAR byte of
+		ld	hl,DR_DELETED_FIRST_CHAR##		;Save first character of the
+		add	hl,de			; entry in the DR_DELETED_FIRST_CHAR byte of
 		ld	a,(de)			; the entry which is otherwise
 		ld	(hl),a			; unused.
 		ld	a,0E5h			;Set the first byte to 0E5h
@@ -275,7 +276,7 @@ not_E5h_fiddle:	ld	(de),a
 		ret	c			; or ".." entries.
 ;
 		push	hl
-		ld	hl,DR_CLU##		;Store start cluster of the
+		ld	hl,DR_FIRST_CLUSTER##		;Store start cluster of the
 		add	hl,de			; directory or file in
 		ld	a,(hl)			; "CHK_CLU" so that "SE_ERR"
 		inc	hl			; flag will get set if this
@@ -283,7 +284,7 @@ not_E5h_fiddle:	ld	(de),a
 		ld	l,a			; new path string.  The is to
 		ld	(CHK_CLU##),hl		; avoid creating loops.)
 ;
-		ld	hl,DR_ATTR##		;Look at attributes byte in
+		ld	hl,DR_ATTRIBUTES##		;Look at attributes byte in
 		add	hl,de			; the directory entry and if
 		ld	a,(hl)			; it is a sub-directory then
 		pop	hl			; zap current dir cluster to
@@ -312,8 +313,8 @@ not_05h_fiddle:	ld	(hl),a			; being 05h.
 		pop	de			;DE -> new path string
 ;
 		ld	c,PCM_DI+PCM_LA+PCM_ND	;Parse the new pathname string
-		ld	b,(ix+FIB_SA##)		; accessing disk, including
-		ld	a,(ix+FIB_DRV##)	; last item and not allowing
+		ld	b,(ix+FIB_SEARCH_ATTRIBUTES##)		; accessing disk, including
+		ld	a,(ix+FIB_DRIVE_NUMBER##)	; last item and not allowing
 		ld	(iy+@SE_FLAGS##),0	; a drive name.  SE_ERR flag
 		pcall	PAR_PATH		; cleared for "CHK_CLU" test.
 		ret	nz			;Give up if any error or
@@ -401,7 +402,7 @@ not_05h_fiddle:	ld	(hl),a			; being 05h.
 		ld	bc,0			; rather than -ve.
 not_root_parent:
 		push	hl
-		ld	hl,DR_CLU##		;Insert new parent directory
+		ld	hl,DR_FIRST_CLUSTER##		;Insert new parent directory
 		add	hl,de			; cluster into the ".." entry.
 		ld	(hl),c
 		inc	hl
@@ -446,7 +447,7 @@ not_root_parent:
 		ret	nz			; on a different FAB.
 ;
 		push	hl
-		ld	hl,DR_ATTR##		;Point to attributes byte
+		ld	hl,DR_ATTRIBUTES##		;Point to attributes byte
 		add	hl,de			; in directory entry and
 		ld	a,(hl)			; get current value.
 ;
@@ -497,7 +498,7 @@ attr_fib_ret:	pop	hl			; and return with no error
 		push	hl
 		push	de
 		pcall	DI_SAME			;Get the directory entry
-		ld	hl,DR_TIME##		; back and copy the new
+		ld	hl,DR_UPDATED_TIME##		; back and copy the new
 		add	hl,de			; date and time values
 		ex	de,hl			; into the appropriate
 		ex	(sp),hl			; fields of it.
@@ -513,7 +514,7 @@ attr_fib_ret:	pop	hl			; and return with no error
 		pop	hl			; with DEL, REN and MOVE
 ;
 CHANGED_ENTRY:	push	hl
-		ld	hl,DR_ATTR##		;Look at attributes byte of
+		ld	hl,DR_ATTRIBUTES##		;Look at attributes byte of
 		add	hl,de			; the entry and if it is not
 		bit	AT_DIR,(hl)		; a sub-directory then set the
 		jr	nz,no_set_archive	; archive bit.

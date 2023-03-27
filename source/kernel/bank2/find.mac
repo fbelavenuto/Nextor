@@ -1,10 +1,11 @@
 	.z80
+	name('find')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Find Functions and Pathname Handling Functions
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -62,7 +63,7 @@ null_path:	db	0			;Null string for parsing
 		ld	a,.IPATH##		; after pathname.
 		ret	nz
 ;
-		ld	bc,UD_CDIR##
+		ld	bc,UD_CURRENT_DIR_FIRST_CLUSTER##
 		add	hl,bc
 		ld	de,(DE_START##)		;Get the validated cluster
 		ld	(hl),e			; number for the new directory
@@ -95,7 +96,7 @@ null_path:	db	0			;Null string for parsing
 		ld	ix,FIB_1##
 		xor	a			;Current drive is default
 		pcall	PAR_PATH
-		ld	c,(ix+FIB_DRV##)	;Get logical drive number
+		ld	c,(ix+FIB_DRIVE_NUMBER##)	;Get logical drive number
 		ld	de,(STR_PTR##)
 		ld	hl,(STR2_PTR##)
 		ret
@@ -245,14 +246,14 @@ find_fib:	push	hl			;Save ASCIIZ filename pointer
 		push	de			;Validate the drive specified
 		ex	(sp),ix			; by old FIB and download
 		call	O_FIB			; the directory variables.
-		ld	c,(ix+FIB_DRV##)	;C := drive from the old FIB
+		ld	c,(ix+FIB_DRIVE_NUMBER##)	;C := drive from the old FIB
 		pop	ix
 		jp	nz,find_ret_1		;Return if error, or if it
 		ld	a,.IDEV##		; is a device FIB.
 		jp	c,find_ret_1
 ;
 		push	hl			;Get the attributes byte
-		ld	hl,DR_ATTR##		; from the directory entry
+		ld	hl,DR_ATTRIBUTES##		; from the directory entry
 		add	hl,de			; so that we can check that
 		ld	a,(hl)			; it is a sub-directory.
 		pop	hl
@@ -269,12 +270,12 @@ find_fib:	push	hl			;Save ASCIIZ filename pointer
 ;
 		push	bc
 		push	hl			;Copy the volume-id from the
-		ld	bc,UD_ID##		; unit descriptor to the
+		ld	bc,UD_VOLUME_ID##		; unit descriptor to the
 		add	hl,bc			; new fileinfo block.
 		push	ix
 		pop	de
 		ex	de,hl
-		ld	bc,FIB_ID##
+		ld	bc,FIB_VOLUME_ID##
 		add	hl,bc
 		ex	de,hl
 		ld	bc,4
@@ -301,7 +302,7 @@ find_rejoin:	bit	SE_SRCH,(iy+@SE_FLAGS##) ;If search then don't
 ;
 		push	ix
 		ex	(sp),hl			;Parse the template filename
-		ld	bc,FIB_NAME##		; as a single filename item
+		ld	bc,FIB_FILENAME##		; as a single filename item
 		add	hl,bc			; into the second filename
 		ld	(STR_PTR##),hl		; buffer "FNM2_BUF".
 		pop	hl
@@ -326,7 +327,7 @@ no_template:	ld	de,FNAME_BUF##
 ;
 		push	ix			;Copy the search filename
 		ex	(sp),hl			; into the "pattern" field
-		ld	bc,FIB_PAT##		; of the fileinfo block so
+		ld	bc,FIB_EXPANDED_SEARCH_PATTERN##		; of the fileinfo block so
 		add	hl,bc			; that it will be ready
 		ex	de,hl			; for "find next"
 		push	de
@@ -352,9 +353,9 @@ find_ret_1:	pop	de			;Clean up stack and
 		ret	nz			; ready to continue search.
 		push	ix
 		ex	(sp),hl
-		ld	de,FIB_PAT##
+		ld	de,FIB_EXPANDED_SEARCH_PATTERN##
 		add	hl,de			;DE -> search filename at
-		ex	de,hl			;      FIB_PAT.
+		ex	de,hl			;      FIB_EXPANDED_SEARCH_PATTERN.
 		pop	hl
 		call	FND_NEXT		;Find the next matching file
 ;
@@ -396,14 +397,14 @@ find_fn_done:	push	af			;Fill the user information
 not_05h_fiddle:	pcall	SQ_NAME			; it into the fileinfo block.
 		pop	hl
 ;
-		ld	bc,FIB_ATTR##		;Get attributes byte from
+		ld	bc,FIB_ATTRIBUTES##		;Get attributes byte from
 		add	hl,bc			; directory entry and put
 		ld	a,(de)			; it into the fileinfo
 		ld	(hl),a			; block.
 ;
 		ex	de,hl
 		inc	de			;DE -> time field of FIB
-		ld	bc,DR_TIME##-DR_ATTR##
+		ld	bc,DR_UPDATED_TIME##-DR_ATTRIBUTES##
 		add	hl,bc			;Copy the date, time, cluster
 		ld	bc,2+2+2+4		; number and size into the
 		ldir				; fileinfo block.
@@ -440,14 +441,14 @@ MOCF_LOOP:
 	pop	iy		;IY = Unit descriptor
 	bit	UF_MNT,(iy+UD_FLAGS##)
 	jr	z,MOCF_NEXT
-	ld	a,(iy+UD_DRV##)
+	ld	a,(iy+UD_MOUNT_DRIVE##)
 	inc	a
 	cp	(ix+25)
 	jr	nz,MOCF_NEXT
-	ld	a,(iy+UD_SCLU##)
+	ld	a,(iy+UD_MOUNT_START_CLUSTER##)
 	cp	(ix+19)
 	jr	nz,MOCF_NEXT
-	ld	a,(iy+UD_SCLU##+1)
+	ld	a,(iy+UD_MOUNT_START_CLUSTER##+1)
 	cp	(ix+20)
 	jr	nz,MOCF_NEXT
 
@@ -544,7 +545,7 @@ reloc_fib:	push	de			;We have been passed an old
 		call	O_FIB			; it and moan if there is
 		ret	nz			; any problem.
 ;
-		bit	AT_VOL,(ix+FIB_SA##)	;Refuse to do anything with
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	;Refuse to do anything with
 		ld	a,.IATTR##		; a volume name FIB.
 		ret	nz
 		xor	a
@@ -555,7 +556,7 @@ loc_fib_done:	or	a			;If error then return
 		ret	nz			; with Z-flag clear.
 ;
 		push	hl
-		ld	hl,DR_ATTR##		;If no error then return
+		ld	hl,DR_ATTRIBUTES##		;If no error then return
 		add	hl,de			; with Z-flag set and
 		ld	a,(hl)			; the attributes byte in
 		pop	hl			; register A.
@@ -596,7 +597,7 @@ loc_fib_done:	or	a			;If error then return
 not_device_fib:	call	GT_DVARS		;Download directory variables
 		ldir				; from the fileinfo block
 ;
-		ld	c,(ix+FIB_DRV##)
+		ld	c,(ix+FIB_DRIVE_NUMBER##)
 		ld	b,1
 		pcall	VAL_FIB			;Validate the drive
 		pop	bc
@@ -624,18 +625,18 @@ not_device_fib:	call	GT_DVARS		;Download directory variables
 ; Corrupts:  AF,BC,DE,HL
 ;
 ;
-		ld	l,(ix+FIB_ID##)
-		ld	h,(ix+FIB_ID##+1)	;Get device descriptor address
+		ld	l,(ix+FIB_VOLUME_ID##)
+		ld	h,(ix+FIB_VOLUME_ID##+1)	;Get device descriptor address
 		push	hl			; and save it for return.
-		ld	de,DD_NAME##
+		ld	de,DD_DEVICE_NAME##
 		add	hl,de			;Get address of the directory
 		push	hl			; entry and save it for return
-		ld	de,DR_TIME##
+		ld	de,DR_UPDATED_TIME##
 		add	hl,de			;Point DE at place for date &
 		ex	de,hl			; time in the directory entry
 		push	ix
 		pop	hl
-		ld	bc,FIB_TIME##		;Point HL at the date and time
+		ld	bc,FIB_MODIFIED_TIME##		;Point HL at the date and time
 		add	hl,bc			; in the FIB or FAB.
 		ld	bc,4			;Copy the date and time to
 		ldir				; the directory entry.
@@ -663,7 +664,7 @@ not_device_fib:	call	GT_DVARS		;Download directory variables
 		ld	de,DE_FSTV##
 		push	ix
 		pop	hl
-		ld	bc,FIB_DVAR##
+		ld	bc,FIB_DIRECTORY_VARIABLES##
 		add	hl,bc
 		ld	bc,DE_LSTV##-DE_FSTV##
 		ret
@@ -675,7 +676,7 @@ not_device_fib:	call	GT_DVARS		;Download directory variables
 ;
 ;   This routine does the work of searching  for  a  match  to  a  file.   The
 ; filename  must be in an expanded format (11 byte) buffer and there must also
-; be validated fileinfo block, with the "FIB_SA" and "FIB_MODE" fields set up.
+; be validated fileinfo block, with the "FIB_SEARCH_ATTRIBUTES" and "FIB_MODE" fields set up.
 ; A  pointer  to  the  unit  descriptor  or  device  descriptor  (depending on
 ; "FIB_MODE") must also be passed. The variable "SE_FLAGS" must be set up with
 ; all  bits  clear  except  the  "SE_SRCH" bit which indicates whether it is a
@@ -685,7 +686,7 @@ not_device_fib:	call	GT_DVARS		;Download directory variables
 ; ".IFNM"  error returned if it is invalid.  It returns an error code and also
 ; a pointer to the located (or newly  created)  directory  entry.   For  some
 ; errors,  register DE is not valid and this is indicated by the Z-flag being
-; clear.  Also for a "create", if the AT_DEV bit of the FIB_SA files  is  set
+; clear.  Also for a "create", if the AT_DEV bit of the FIB_SEARCH_ATTRIBUTES files  is  set
 ; then  the  "SE_NEW" flag is set to ensure that an existing file will not be
 ; over-written.
 ;
@@ -705,17 +706,17 @@ not_device_fib:	call	GT_DVARS		;Download directory variables
 		bit	SE_SRCH,(iy+@SE_FLAGS##);If we are doing a "create"
 		jr	nz,fnd_not_create	; then check that the filename
 		push	de			; being created is legal,
-		ld	a,(ix+FIB_SA##)		; including rejecting device
+		ld	a,(ix+FIB_SEARCH_ATTRIBUTES##)		; including rejecting device
 		and	ATM_DIR			; names if creating a directory
 		pcall	TST_NAME		; and return an error if not.
 		pop	de
 		ret	nz
-		bit	AT_DEV,(ix+FIB_SA##)	;If "create" and the device
+		bit	AT_DEV,(ix+FIB_SEARCH_ATTRIBUTES##)	;If "create" and the device
 		jr	z,not_create_new	; bit or required attributes
 		set	SE_NEW,(iy+@SE_FLAGS##)	; is set then set a flag to
 not_create_new:					; prevent overwriting of
 						; existing files.
-fnd_not_create:	res	AT_DEV,(ix+FIB_SA##)
+fnd_not_create:	res	AT_DEV,(ix+FIB_SEARCH_ATTRIBUTES##)
 		ld	(FNM_PTR##),de		;Save pointer to filename
 ;
 		bit	MD_DEV,(ix+FIB_MODE##)	;Jump if we are being asked
@@ -728,7 +729,7 @@ fnd_not_create:	res	AT_DEV,(ix+FIB_SA##)
 ;
 ;
 fnd_device:	push	hl			;For a device, point to the
-		ld	de,DD_NAME##		; directory entry in the
+		ld	de,DD_DEVICE_NAME##		; directory entry in the
 		add	hl,de			; device descriptor.
 		ex	de,hl			;DE -> directory entry
 		call	DATE_TIME		;Put current date/time in
@@ -761,7 +762,7 @@ got_name_match:	bit	SE_SRCH,(iy+@SE_FLAGS##);GOT MATCHING ENTRY, always
 		jr	nz,found_return		; (NM_SEARCH checks this).
 		and	ATM_HID+ATM_SYS+ATM_DIR	;If entry is hidden, system or
 		cpl				; a sub-directory then only
-		or	(ix+FIB_SA##)		; match it if the appropriate
+		or	(ix+FIB_SEARCH_ATTRIBUTES##)		; match it if the appropriate
 		inc	a			; bits are also set in the
 		jr	nz,fnd_loop		; search attributes.
 		jr	found_return
@@ -776,7 +777,7 @@ got_ent_create:	ld	b,a
 		bit	AT_DIR,b		; directory then jump to return
 		ld	a,.DIRX##		; an appropriate error code.
 		jr	nz,found_inv_ret
-		bit	AT_DIR,(ix+FIB_SA##)	;In these cases the user fields
+		bit	AT_DIR,(ix+FIB_SEARCH_ATTRIBUTES##)	;In these cases the user fields
 file_exists:	ld	a,.FILEX##		; of the FIB will be set up as
 		jr	nz,found_inv_ret	; if it was successful.
 ;
@@ -796,7 +797,7 @@ create_entry:	ld	de,(FNM_PTR##)		;Refuse to create a "." or
 		ret				; pointer.
 ;
 not_dot_reject:	ld	bc,0			;CREATE ENTRY.  If not creating
-		bit	AT_DIR,(ix+FIB_SA##)	; sub-directory then jump with
+		bit	AT_DIR,(ix+FIB_SEARCH_ATTRIBUTES##)	; sub-directory then jump with
 		jr	z,create_not_dir	; BC=0 (cluster number)
 ;
 		ld	a,0FFh			;CREATE SUB-DIR.  Allocate one
@@ -807,9 +808,9 @@ not_dot_reject:	ld	bc,0			;CREATE ENTRY.  If not creating
 ;
 create_not_dir:	pcall	DI_SAME			;Ensure entry still bufferred
 		ld	a,ATM_VOL+ATM_ARC	;If creating volume name then
-		bit	AT_VOL,(ix+FIB_SA##)	; make sure just volume name
+		bit	AT_VOL,(ix+FIB_SEARCH_ATTRIBUTES##)	; make sure just volume name
 		jr	nz,got_new_attrs	; and archive bits are set.
-		ld	a,(ix+FIB_SA##)		    ;If creating directory then
+		ld	a,(ix+FIB_SEARCH_ATTRIBUTES##)		    ;If creating directory then
 		set	AT_ARC,a		    ; clear archive, read only
 		bit	AT_DIR,a		    ; and system bits, else
 		jr	z,not_dir_attrs		    ; set archive bit and leave
@@ -960,7 +961,7 @@ not_root:	ld	bc,-4			;Point back at start cluster
 		push	bc			;Save registers for return
 		push	de
 ;
-		ld	hl,DR_TIME##		;Point HL at TIME field in
+		ld	hl,DR_UPDATED_TIME##		;Point HL at TIME field in
 		add	hl,de			; the directory entry and get
 		push	hl			; current date and time.
 		
@@ -971,7 +972,7 @@ not_root:	ld	bc,-4			;Point back at start cluster
 		ex af,af'
 		ld	ix,GT_DATE_TIME##
 		ld	(BK4_ADD##),ix
-		ld	ix,?C4PBK##
+		ld	ix,C4PBK##
 		ld	iy,(MASTER_SLOT##-1)
 		call	CALSLT##
 		ex	af,af'
@@ -1025,7 +1026,7 @@ NM_SEARCH_MORE:
 ; by  the  SEARCH/MAKE/CREATE  function  above.  In addition it is used by the
 ; RENAME and MOVE functions to check for possible name clashes.  The directory
 ; search  must  have  been initiated with a suitable DI_FIRST or DI_NEXT call.
-; The filename must be pointed to by the  variable  "FNM_PTR".   The  "FIB_SA"
+; The filename must be pointed to by the  variable  "FNM_PTR".   The  "FIB_SEARCH_ATTRIBUTES"
 ; field  of the FIB is used to determine whether it is a volume name search or
 ; an ordinary filename search.
 ;
@@ -1047,7 +1048,7 @@ search_loop:	pcall	DI_NEXT			;Get next directory entry
 		push	ix
 		ex	(sp),hl			;Point HL at filename to
 		ld	hl,(FNM_PTR##)		; be matched and compare
-		ld	a,(ix+FIB_SA##)		; with name in directory
+		ld	a,(ix+FIB_SEARCH_ATTRIBUTES##)		; with name in directory
 		pcall	CMP_NAME		; entry (DE).  A = volume
 		pop	hl			; name flag.
 		ret	c			;Return C-set if names match

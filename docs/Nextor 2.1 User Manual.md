@@ -42,6 +42,8 @@
 
 [2.13. File mounting and disk emulation mode](#213-file-mounting-and-disk-emulation-mode)
 
+[2.14. The KILLDSKIO environment variable](#214-the-killdskio-environment-variable)
+
 [3. Using Nextor](#3-using-nextor)
 
 [3.1. Installing Nextor](#31-installing-nextor)
@@ -107,6 +109,8 @@
 [3.6.10. The CALL MAPDRVL command](#3610-the-call-mapdrvl-command)
 
 [3.6.11. The CALL USR command](#3611-the-call-usr-command)
+
+[3.6.12 The CALL SYSTEM2 command](#3611-the-call-system2-command)
 
 [3.7. New BASIC error codes](#37-new-basic-error-codes)
 
@@ -339,6 +343,12 @@ Since version 2.1 Nextor allows to mount disk image files in two ways:
 
 * Booting in disk emulation mode, so the system boots in MSX-DOS 1 mode and uses a set disk image files (one at a time) as the boot device. See [3.9. Disk emulation mode](#39-disk-emulation-mode).
 
+### 2.14. The KILLDSKIO environment variable
+
+Since version 2.1.1 Nextor provides a mechanism to disable the BASIC commands `DSKI$` and `DSKO$`, which gives 512 extra bytes of free memory for the BASIC environment. This is achieved by creating an environment variable named `KILLDSKIO` with a value of `ON` (case-insensitive).
+
+Note that when `DSKI$` and `DSKO$` are disabled in this way the `DIRBUF` variable (&HF351), which holds the address of the 512 byte buffer where these commands read and write sectors, will have the same value as `SECBUF` (&HF34D), which is a generic sector buffer used internally by Nextor; and the same goes for `PATHNAM` (&HF33B), a buffer used by BASIC to parse pathnames for commands like `FILES`. This shouldn't be a problem in most cases, but for robustness it's recommended to use this feature only when that extra memory is abolutely necessary.
+
 
 ## 3. Using Nextor
 
@@ -357,6 +367,8 @@ Nextor consists of the following components:
 **Note:** two variants of the NEXTOR.SYS file exist. See _[4.3. Reduced NEXTOR.SYS without Japanese error messages](#43-reduced-nextorsys-without-japanese-error-messages)_.
 
 **Note:** starting with Nextor 2.1.0 beta 2, the kernel will try to load MSXDOS2.SYS if NEXTOR.SYS is not found. However in this case the Nextor command line tools won't work.
+
+**Note:** starting with Nextor 2.1.0 beta 2, [the `CALL SYSTEM2` command](#3611-the-call-system2-command) can be used in BASIC to force a reboot in the DOS environment using MSXDOS2.SYS, even if NEXTOR.SYS exists.
 
 In order to boot in the MSX-DOS 1 prompt, you need the usual MSXDOS.SYS and COMMAND.COM files. Also, if you have just the kernel and no NEXTOR.SYS or MSXDOS.SYS files, Nextor will boot in the BASIC prompt (running AUTOEXEC.BAS if present).
 
@@ -406,7 +418,7 @@ After all drives have been assigned to drivers, a device and partition to drive 
 
 1. The device doesn't have the "don't use for automapping" flag set (this flag is set by the driver)
 2. Is a valid FAT12 or FAT16 partition (only FAT12 when booting in MSX-DOS 1 mode)
-3. Has the "active" flag set in the partition table (this can be set using [FDISK](#35-the-built-in-partitioning-tool))
+3. Has the "active" flag set in the partition table (the most significant bit in the first byte of the partition table entry; this can be set using [FDISK](#35-the-built-in-partitioning-tool))
 4. No drives have been already mapped to partitions in the same device
 
 If no partitions are found that meet all three conditions, then the search is started over, but this time skipping the "active" flag check. If this fails again, absolute sector 0 of the device is checked (to see if the device doesn't have partitions but holds a valid FAT filesystem) as a last resort before leaving the drive unmapped.
@@ -518,7 +530,7 @@ If "d" is specified instead of a partition number, then the drive will be mapped
 
 * If at boot time the drive was assigned to a MSX-DOS driver unit, or to a Nextor drive-based unit, then it is mapped to the same unit.
 
-* If at boot time the drive was assigned to a Nextor device-based driver, then an automatic mapping procedure (equal to the one performed at boot time, except that the NEXTOR.DAT file is not searched) will be performed. This may or may not result in the drive having the same mapping it had at boot time, depending on the mapping state of the other drives.
+* If at boot time the drive was assigned to a Nextor device-based driver, then an automatic mapping procedure (equal to the one performed at boot time, except that "active" partition flags are not checked) will be performed. This may or may not result in the drive having the same mapping it had at boot time, depending on the mapping state of the other drives.
 
 If "u" is specified instead of a partition number, then the drive will be left unmapped
 
@@ -849,7 +861,7 @@ CALL MAPDRV(<drive>, -2)
 CALL MAPDRV(<drive>)
 ```
 
-Maps the specified drive to its default value. If at boot time the drive was unmapped or was mapped to a MSX-DOS driver or to a Nextor drive-based driver, then the drive will be reverted to its original mapping state. Otherwise, and automatic mapping procedure will be performed (the procedure is equal to the one performed at boot time except that the NEXTOR.DAT file will not be searched; see _[3.2. Booting Nextor](#32-booting-nextor)_ for more details); this may result or not on the drive having the same mapping it had at boot time, depending on which devices are available and how the other drives are mapped.
+Maps the specified drive to its default value. If at boot time the drive was unmapped or was mapped to a MSX-DOS driver or to a Nextor drive-based driver, then the drive will be reverted to its original mapping state. Otherwise, and automatic mapping procedure will be performed (the procedure is equal to the one performed at boot time except that "active" partition flags will not be checked; see _[3.2. Booting Nextor](#32-booting-nextor)_ for more details); this may result or not on the drive having the same mapping it had at boot time, depending on which devices are available and how the other drives are mapped.
 
 The command parameters syntax is as follows:
 
@@ -921,6 +933,13 @@ Here is a simple BASIC program to test the CALL USR command. Change the register
 160 PRINT "IY=&H";HEX$(R(5))
 ````
 
+#### 3.6.12 The CALL SYSTEM2 command
+
+Nextor 2.1.1 introduced a new `CALL SYSTEM2` command. This command works the same as `CALL SYSTEM`, but will always load MSXDOS2.SYS, even if a file named NEXTOR.SYS exists. This can be useful to get back some TPA space for applications, since MSXDOS2.SYS is smaller than NEXTOR.SYS.
+
+Note however that the new function calls introduced by Nextor won't work if NEXTOR.SYS isn't loaded, this implies that the Nextor-specific command line tools (e.g. `MAPDRV.COM`) won't work if the DOS environment is entered via `CALL SYSTEM2` command.
+
+
 ### 3.7. New BASIC error codes
 
 The following new BASIC error codes are defined to handle the possible errors of the new BASIC commands. These errors are available in MSX-DOS 1 mode as well for the commands that work in this environment. The numbers in parenthesis are the error codes.
@@ -955,6 +974,10 @@ An attempt to open or alter a mounted file, or to perform any other disallowed o
 
 Thrown by the CALL MAPDRV command when attempting to mount a file that is smaller than 512 bytes or larger than 32 MBytes.
 
+* Invalid cluster sequence (82)
+
+Thrown by the CALL MAPDRV command when attempting to mount a file that is not stored across consecutive sectors in its host filesystem.
+
 
 ### 3.8. Mounting files
 
@@ -964,7 +987,9 @@ To mount a file, use [the MAPDRV tool](#341-mapdrv-the-drive-mapping-tool) with 
 
 This feature has some restrictions:
 
-* To be mountable a disk image file must have a size of at least 512 bytes and at most 32 MBytes.
+* The file must have a size of at least 512 bytes and at most 32 MBytes.
+
+* The file must be stored across consecutive sectors in its host filesystem (since Nextor 2.1.1).
 
 * The file is expected to contain a proper FAT filesystem already, it is not possible to apply the FORMAT command on a mounted drive. 
 
@@ -1103,6 +1128,10 @@ This section contains the change history for the different versions of Nextor. C
 
 This list contains the changes for the 2.1 branch only. For the change history of the 2.0 branch see the _[Nextor 2.0 User Manual](../../../blob/v2.0/docs/Nextor%202.0%20User%20Manual.md#5-change-history)_ document.
 
+
+### 5.1. v2.1.1 beta 2
+
+- Introduced the 
 
 ### 5.1. v2.1.0 beta 2
 

@@ -1,10 +1,11 @@
 	.z80
+	name('doshead')
 	title	MSX-DOS 2 ROM   Copyright (1986)  IS Systems Ltd.
 	subttl	ROM Header for MSX-DOS 2.0 ROM
 ;-----------------------------------------------------------------------------
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 ;
 ;
 ; This  is the ROM header for the MSX-DOS ROM.  It must always be linked first
@@ -88,6 +89,7 @@ $DOSVER::	defw	_$DOSVER##	;DOS version string.
 EXTB_RET:	exx
 		ex	af,af'
 		ret
+
 ;
 JPHL	equ	$+1
 JPIX:		jp	(ix)
@@ -142,21 +144,21 @@ RAMENT::				; RAM DISK DRIVER ENTRY POINTS
 ;
 ; Call routine in bank 4, routine address is placed in BK4_ADD
 
-?C4PBK::	ld	a,(BNK_ID##)
+C4PBK::	ld	a,(BNK_ID##)
 		jr	CALL4_COMMON
 
-?CALL4::	xor	a
+CALL4:	xor	a
 
 CALL4_COMMON:	push	af
 		ld	a,4
-		call	CHGBNK##	;Select desired bank
+		call	CHGBNK	;Select desired bank
 		ld	ix,(BK4_ADD##)
 		ex	af,af'		;Restore AF
 		ld	iy,RAM_BASE##	;Required for function calls
 		call	JPIX		;Go do the function
 		ex	af,af'
 		pop	af
-		call	CHGBNK##	;Re-select bank #0 (CALL4)
+		call	CHGBNK	;Re-select bank #0 (CALL4)
 		ex	af,af'		;or previous bank (C4PBK)
 		ret
 
@@ -201,13 +203,13 @@ CALBNK:		exx
 		pop	ix
 		ld	a,e
 		exx
-		call	CHGBNK##	;Select desired bank
+		call	CHGBNK	;Select desired bank
 		ex	af,af'
 		ret			;Go do the function
 CBNK_CONT:		
 		ex	af,af'
 		pop	af
-		call	CHGBNK##	;Always re-select bank #0
+		call	CHGBNK	;Always re-select bank #0
 		ex	af,af'
 		ret
 
@@ -225,15 +227,15 @@ CBNK_CONT:
 		ld	a,(BNK_ID##)	;Save current bank
 		push	af
 		xor 	a		
-		call	CHGBNK##
+		call	CHGBNK
 		call	TIMINT##
 		pop	af		;Restore old bank
-		call	CHGBNK##
+		call	CHGBNK
 		pop	af		;Restore VDP status
 		ret
 
 DOINIT:		xor	a		;Jump to the INIT routine in bank-0
-		call	CHGBNK##
+		call	CHGBNK
 		jp	INIT##
 
 HEADEND::

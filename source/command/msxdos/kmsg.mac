@@ -1,5 +1,6 @@
-	.Z80
+ï»¿	.Z80
 ;
+	name('KMSG')
 	TITLE	MSX-DOS 2 - MSX-DOS.SYS copyright (1986) IS Systems Ltd
 	SUBTTL	Sample Messages File (Kanji)
 ;
@@ -28,6 +29,9 @@
 ; line. Don't forget a DEFB 0 at the end though !.
 ;
 ;
+
+	.strenc shift_jis
+
 MSG	MACRO	NAME,TEXT
 __&NAME	 EQU	MSGNO		;; Define message number label.
 MSGNO	 DEFL	MSGNO+1
@@ -94,13 +98,13 @@ CR	EQU	0DH
 
 ;
 	MSG	READING			; Part (c), one leading space.
-	 DEFB	" (“Ç‚İ",0
+	 DEFB	" (èª­ã¿",0
 ;
 	MSG	WRITING			; Part (d), one leading psace.
-	 DEFB	" (‘‚«",0
+	 DEFB	" (æ›¸ã",0
 ;
 	MSG	DRIVE			; Part (e).
-	 DEFB	"‚İ’†) ƒhƒ‰ƒCƒu‚Í",0
+	 DEFB	"è¾¼ã¿ä¸­) ãƒ‰ãƒ©ã‚¤ãƒ–ã¯",0
 ;
 	MSG	ARIDRV			; Printed after the drive letter.
 	 DEFB	':',0
@@ -115,10 +119,10 @@ CR	EQU	0DH
 ;
 ;
 	MSG	AR		; Message for when 'ignore' is not recommended.
-	 DEFB	"’†~(A)/Äs(R)? ",0
+	 DEFB	"ä¸­æ­¢(A)/å†è©¦è¡Œ(R)? ",0
 ;
 	MSG	ARI		; Message for when 'ignore' isn't so dangerous.
-	 DEFB	"’†~(A)/Äs(R)/–³‹(I)? ",0
+	 DEFB	"ä¸­æ­¢(A)/å†è©¦è¡Œ(R)/ç„¡è¦–(I)? ",0
 ;
 ;
 ;
@@ -175,21 +179,23 @@ CR	EQU	0DH
 	 DEFB	0
 ;
 	MSG	INSERT			; Part (d)
-	 DEFB	"COMMAND2.COM‚Ì“ü‚Á‚½ƒfƒBƒXƒN‚ğƒhƒ‰ƒCƒu ",0
+	 DEFB	"COMMAND2.COMã®å…¥ã£ãŸãƒ‡ã‚£ã‚¹ã‚¯ã‚’ãƒ‰ãƒ©ã‚¤ãƒ– ",0
 ;
 	MSG	INSDRV			; Part (e).
-	 DEFB	": ‚É“ü‚ê‚Ä",0
+	 DEFB	": ã«å…¥ã‚Œã¦",0
 ;
 	MSG	PAUSE			; Part (f), one
 					;   trailing space.
-	 DEFB	"‰½‚©ƒL[‚ğ‰Ÿ‚µ‚Ä‚­‚¾‚³‚¢. ",0
+	 DEFB	"ä½•ã‹ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ãã ã•ã„. ",0
 ;
 	MSG	NOMEM
-	 DEFB	"ƒƒ‚ƒŠ‚ª‘«‚è‚Ü‚¹‚ñ. ƒVƒXƒeƒ€‚Í’â~‚µ‚Ü‚µ‚½",0
+	 DEFB	"ãƒ¡ãƒ¢ãƒªãŒè¶³ã‚Šã¾ã›ã‚“. ã‚·ã‚¹ãƒ†ãƒ ã¯åœæ­¢ã—ã¾ã—ãŸ",0
 ;
 	MSG	BADVER
-	 DEFB	"MSX-DOS‚Ìƒo[ƒWƒ‡ƒ“‚ªˆá‚¢‚Ü‚·. ƒVƒXƒeƒ€‚Í’â~‚µ‚Ü‚µ‚½",0
+	 DEFB	"MSX-DOSã®ãƒãƒ¼ã‚¸ãƒ§ãƒ³ãŒé•ã„ã¾ã™. ã‚·ã‚¹ãƒ†ãƒ ã¯åœæ­¢ã—ã¾ã—ãŸ",0
 ;
 ;
 ;
+	.strenc default
+
 	END

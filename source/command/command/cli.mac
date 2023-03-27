@@ -1496,7 +1496,7 @@ if 1
 		CALL	_BDOS		;   we can proceed.
 		RET	NZ		; Report any errors.
 
-		LD	A,(BUFF##+20)	; We had better define "FIB_ID".
+		LD	A,(BUFF##+20)	; We had better define "FIB_VOLUME_ID".
 		BIT	7,A		; This is not actuall a
 		LD	A,.BADVER##	;   "Wrong DOS version" what the error
 		RET	NZ		;   code was intended for.

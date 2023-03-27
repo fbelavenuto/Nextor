@@ -1,10 +1,11 @@
 	.z80
+	name('dir')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Directory Entry and Fileinfo Block Handling
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;-----------------------------------------------------------------------------
@@ -31,7 +32,7 @@
 ;
 ;
 		push	hl
-		ld	hl,DR_CLU##		;Get start cluster number from
+		ld	hl,DR_FIRST_CLUSTER##		;Get start cluster number from
 		add	hl,de			; directory entry and jump to
 		ld	e,(hl)			; START_DIR to store it in the
 		inc	hl			; DE_START variable.
@@ -79,7 +80,7 @@ no_chk_clu:	pop	hl
 ;		   NZ => entry in use, or deleted
 ; Corrupts:    AF,DE
 ;
-; Assumes:     UD_WDS=UD_ODE+1    UD_SDIR=UD_WDS+2
+; Assumes:     UD_WHOLE_DIR_SECTORS=UD_ODD_DIR_ENTRIES+1    UD_FIRST_ROOT_DIR_SECTOR=UD_WHOLE_DIR_SECTORS+2
 ;
 ;
 						;Get first directory cluster
@@ -94,7 +95,7 @@ no_chk_clu:	pop	hl
 		ld	(DE_EX_SECTOR##),a	;first directory sector number (bit16-22)
 		push	bc			;Save user's BC
 		push	hl
-		ld	bc,UD_ODE##
+		ld	bc,UD_ODD_DIR_ENTRIES##
 		add	hl,bc
 		ld	c,(hl)			;C := number of odd entries
 		inc	hl			;     in last directory sector
@@ -222,7 +223,7 @@ SUB_DI_FIRST:	push	bc
 		ld	(DE_EX_SECTOR##),a	;Record new sector number bit16-22
 ;
 		ex	de,hl
-		ld	hl,UD_CMSK##		;Get UD_CMSK+1 from unit
+		ld	hl,UD_CLUSTER_MASK##		;Get UD_CLUSTER_MASK+1 from unit
 		add	hl,de			; descriptor which will be
 		ld	a,(hl)			; recorded as number of sectors
 		inc	a			; in this cluster.
@@ -289,7 +290,7 @@ got_dev_entry:
 		push ix				;If it's an used entry and the attributes byte is 0Fh
 		push de             ;then it's along filename entry, so ignore it
 		pop ix				;and go get the next one
-		ld a,(ix+DR_ATTR##)
+		ld a,(ix+DR_ATTRIBUTES##)
 		cp 0Fh
 		jr nz,got_dev_entry_end
 		pop ix

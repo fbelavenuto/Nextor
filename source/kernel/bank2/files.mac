@@ -1,10 +1,11 @@
 	.z80
+	name('files')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	File Read and Write Routines
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -59,48 +60,6 @@
 ;
 	PROC	RDWR_FAB
 ;
-
-		ex	af,af'
-		ld	a,(RW_LEVEL##)
-		cp	1
-		jr	nz,OKLEVEL
-
-		ld	hl,(RW_OVER##)
-		push	hl
-		ld	hl,(RW_OVER##+2)
-		push	hl
-		ld	hl,(RW_OVER##+4)
-		push	hl
-		ld	hl,(RW_OVER##+6)
-		push	hl
-		ld	hl,(RW_OVER##+8)
-		push	hl
-		ld	hl,(RW_OVER##+10)
-		push	hl
-		ld	hl,(RW_OVER##+12)
-		push	hl
-		ld	hl,(RW_OVER##+14)
-		push	hl
-		ld	hl,(RW_OVER##+16)
-		push	hl
-		ld	hl,(RW_OVER##+18)
-		push	hl
-		ld a,(RW_EX_PSEC##)	;When the drive has a file mounted VAL_FIB may
-		ld h,a              ;corrupt the variables we've set so far, so save them.
-		ld a,(RW_FLAGS##)
-		ld l,a
-		push hl
-		ld hl,(RW_PSEC##)
-		push hl
-		ld hl,(RW_DTA##)
-		push hl
-
-OKLEVEL:
-		ld	a,(RW_LEVEL##)
-		inc	a
-		ld	(RW_LEVEL##),a
-		ex	af,af'
-
 		bit	MD_DEV,(ix+FAB_MODE##)	;Jump to handle device reads
 		jp	nz,rdwr_device		; and writes separately.
 ;
@@ -109,7 +68,7 @@ OKLEVEL:
 		and	RFM_SZ			;If amount to transfer is zero
 		or	b			; and the RF_SIZE flag is not
 		or	c			; set then return immediately
-		jr	z,RDWR_END			; with no error.
+		ret	z			; with no error.
 ;
 		ld	hl,0			;Zero bytes transferred
 		ld	(RW_SZ_DONE##),hl	; so far.
@@ -119,18 +78,18 @@ OKLEVEL:
 		ld	bc,(RW_SZ_DONE##)	;BC := amount transferred
 		ld	de,(RW_DTA##)		;DE := updated DTA address
 ;
-rdwr_dev_done:	ld	l,(ix+FAB_PTR##)	;Add the amount transferred
-		ld	h,(ix+FAB_PTR##+1)	; on to the file pointer in
+rdwr_dev_done:	ld	l,(ix+FAB_FILE_POINTER##)	;Add the amount transferred
+		ld	h,(ix+FAB_FILE_POINTER##+1)	; on to the file pointer in
 		add	hl,bc			; the FAB, remembering to
-		ld	(ix+FAB_PTR##),l	; carry into the top two
-		ld	(ix+FAB_PTR##+1),h	; bytes if required.
+		ld	(ix+FAB_FILE_POINTER##),l	; carry into the top two
+		ld	(ix+FAB_FILE_POINTER##+1),h	; bytes if required.
 		jr	nc,no_ptr_carry
-		inc	(ix+FAB_PTR##+2)
+		inc	(ix+FAB_FILE_POINTER##+2)
 		jr	nz,no_ptr_carry
-		inc	(ix+FAB_PTR##+3)
+		inc	(ix+FAB_FILE_POINTER##+3)
 no_ptr_carry:
 rdwr_error:	or	a
-		jr	nz,RDWR_END			;Return if error
+		ret	nz			;Return if error
 ;
 		bit	RF_SIZE,(iy+@RW_FLAGS##);Don't check for zero bytes
 		jr	nz,rdwr_ret_ok		; if "change file size"
@@ -141,50 +100,7 @@ rdwr_error:	or	a
 		ld	a,.EOF##		; transferred was zero, in
 		jr	z,rdwr_error		; which case return an end
 rdwr_ret_ok:	xor	a			; of file error.
-		
-RDWR_END:
-		ex	af,af'
-		ld	a,(RW_LEVEL##)
-		cp	2
-		jr	nz,OKLEVEL2
 
-		pop hl
-		ld (RW_DTA##),hl
-		pop hl
-		ld (RW_PSEC##),hl
-		pop hl
-		ld a,l
-		ld (RW_FLAGS##),a
-		ld a,h
-		ld (RW_EX_PSEC##),a
-		pop	hl
-		ld	(RW_OVER##+18),hl
-		pop	hl
-		ld	(RW_OVER##+16),hl
-		pop	hl
-		ld	(RW_OVER##+14),hl
-		pop	hl
-		ld	(RW_OVER##+12),hl
-		pop	hl
-		ld	(RW_OVER##+10),hl
-		pop	hl
-		ld	(RW_OVER##+8),hl
-		pop	hl
-		ld	(RW_OVER##+6),hl
-		pop	hl
-		ld	(RW_OVER##+4),hl
-		pop	hl
-		ld	(RW_OVER##+2),hl
-		pop	hl
-		ld	(RW_OVER##),hl
-
-OKLEVEL2:
-		ld	a,(RW_LEVEL##)
-		dec	a
-		ld	(RW_LEVEL##),a
-		ex	af,af'
-
-RDWR_END2:
 		ret
 ;
 ;	----------------------------------------
@@ -192,24 +108,24 @@ RDWR_END2:
 rdwr_device:
 		ld	h,a			;Store the paging mode
 		and	RFM_PG			; flag in the FAB ready for
-		ld	(ix+FAB_PG##),a		; passing to GET_SEGMENT
+		ld	(ix+FAB_TEMP_PAGING_MODE##),a		; passing to GET_SEGMENT
 ;
 		ld	a,b			;Do nothing if zero bytes
 		or	c			; requested
-		jr z,RDWR_END
+		ret z
 ;
 		bit	RF_READ,h
 		jr	nz,read_device		;Skip if read.
 ;
-		ld	l,(ix+FAB_ID##+2)	;Get device jump table
-		ld	h,(ix+FAB_ID##+3)	; address into HL and point
+		ld	l,(ix+FAB_VOLUME_ID##+2)	;Get device jump table
+		ld	h,(ix+FAB_VOLUME_ID##+3)	; address into HL and point
 		inc	hl			; to second entry which is
 		inc	hl			; the WRCH routine.
 		inc	hl
 ;
 		push	bc			;Save total number of bytes
 wr_dev_loop:	push	de
-		ld	a,(ix+FAB_PG##)		;Get next byte to write from
+		ld	a,(ix+FAB_TEMP_PAGING_MODE##)		;Get next byte to write from
 		pcall	GET_SEGMENT		; the correct segment as
 		ex	de,hl			; determined by the paging
 		call	RD_SEG##		; mode.
@@ -251,8 +167,8 @@ rdwr_dev_done2:	jp	rdwr_dev_done		;Check for BC=0 & return
 ;
 ;
 ;
-read_device:	ld	l,(ix+FAB_ID##+2)	;HL -> first entry in jump
-		ld	h,(ix+FAB_ID##+3)	; table which is READ routine.
+read_device:	ld	l,(ix+FAB_VOLUME_ID##+2)	;HL -> first entry in jump
+		ld	h,(ix+FAB_VOLUME_ID##+3)	; table which is READ routine.
 ;
 		push	bc			;Save total number of bytes
 
@@ -283,7 +199,7 @@ file_end_ch:	inc	c			;C=1 => end of file
 rdch_normal:
 		push	de
 		push	hl
-		ld	a,(ix+FAB_PG##)		;Find the address to write the
+		ld	a,(ix+FAB_TEMP_PAGING_MODE##)		;Find the address to write the
 		pcall	GET_SEGMENT		; byte to according to the
 		ex	de,hl			; paging mode and then write
 		ld	e,b			; the character there.
@@ -348,20 +264,20 @@ READ_WRITE:
 ;
 ;
 		ld	a,.HDEAD##		;Don't do anything if the
-		bit	AC_DEAD,(ix+FAB_ACC##)	; file has been deleted on
+		bit	AC_DEAD,(ix+FAB_ACCESS_MODE##)	; file has been deleted on
 		ret	nz			; us.
 ;
 		ld	a,.ACCV##
 		bit	RF_READ,(iy+@RW_FLAGS##)
 		jr	z,write_check
-		bit	AC_RD,(ix+FAB_ACC##)	;For a read operation, error
+		bit	AC_RD,(ix+FAB_ACCESS_MODE##)	;For a read operation, error
 		ret	nz			; if read inhibit access flag
 		jr	access_ok		; is set.
 ;
-write_check:	bit	AC_WR,(ix+FAB_ACC##)	;For a write operation, error
+write_check:	bit	AC_WR,(ix+FAB_ACCESS_MODE##)	;For a write operation, error
 		ret	nz			; if write inhibit bit is
 		ld	a,.FILRO##		; set or if it is a read
-		bit	AT_RO,(ix+FAB_ATTR##)	; only file.
+		bit	AT_RO,(ix+FAB_ATTRIBUTES##)	; only file.
 		ret	nz
 ;
 access_ok:	bit	0,(iy+@LAZY##)
@@ -372,7 +288,7 @@ access_ok:	bit	0,(iy+@LAZY##)
 		ret	c			; an error.
 skip_ov64k:
 ;
-		ld	c,(ix+FAB_DRV##)	;Validate the drive specified
+		ld	c,(ix+FAB_DRIVE_NUMBER##)	;Validate the drive specified
 		ld	b,1			; in the FAB and give up if
 		pcall	VAL_FIB			; any error.
 		or	a
@@ -460,12 +376,12 @@ whole_sec_done:	ld	bc,0			;Transfer last partial sector,
 		ret	nz
 ;
 		ld	de,(RW_PCLU##)		;Record physical cluster in
-		ld	(ix+FAB_LPC##),e	; FAB as last accessed cluster.
-		ld	(ix+FAB_LPC##+1),d
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##),e	; FAB as last accessed cluster.
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##+1),d
 ;
 		ld	de,(RW_LCLU##)		;Record logical cluster in
-		ld	(ix+FAB_LLC##),e	; FAB as last accessed cluster.
-		ld	(ix+FAB_LLC##+1),d
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##),e	; FAB as last accessed cluster.
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##+1),d
 		ret
 ;
 ;
@@ -644,10 +560,10 @@ START_RW:
 ;
 ;
 		push	hl		   ;LV1
-		ld	c,(ix+FAB_PTR##)
-		ld	b,(ix+FAB_PTR##+1)
-		ld	e,(ix+FAB_PTR##+2)
-		ld	d,(ix+FAB_PTR##+3)	;Get file pointer from FAB and
+		ld	c,(ix+FAB_FILE_POINTER##)
+		ld	b,(ix+FAB_FILE_POINTER##+1)
+		ld	e,(ix+FAB_FILE_POINTER##+2)
+		ld	d,(ix+FAB_FILE_POINTER##+3)	;Get file pointer from FAB and
 		push	de		   ;LV2	; put on stack for later.
 		push	bc		   ;LV3	;Split file pointer into
 		call	DECODE_PTR		; cluster, sector and byte.
@@ -684,10 +600,10 @@ not_zero_sz:	adc	hl,de
 		push	de		   ;LV4	;Save final cluster number
 						; (only used for WRITE).
 ;
-		ld	c,(ix+FAB_SIZE##)
-		ld	b,(ix+FAB_SIZE##+1)
-		ld	e,(ix+FAB_SIZE##+2)
-		ld	d,(ix+FAB_SIZE##+3)	;Get file size from FAB.
+		ld	c,(ix+FAB_FILE_SIZE##)
+		ld	b,(ix+FAB_FILE_SIZE##+1)
+		ld	e,(ix+FAB_FILE_SIZE##+2)
+		ld	d,(ix+FAB_FILE_SIZE##+3)	;Get file size from FAB.
 		ld	a,b
 		or	c
 		dec	bc
@@ -752,8 +668,8 @@ ret_err_3_nz:	jr	nz,ret_err_3		;(Error if DECODE_PTR failed)
 		pop	de		   ;LV3
 		ld	bc,0FFFFh		;Mark the new end of the
 		pcall	FAT_ASET		; cluster chain.
-		ld	c,(ix+FAB_FPC##)	;Jump to reset cached cluster
-		ld	b,(ix+FAB_FPC##+1)	; to start of file in case it
+		ld	c,(ix+FAB_FIRST_PHYSICAL_CLUSTER##)	;Jump to reset cached cluster
+		ld	b,(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1)	; to start of file in case it
 		scf				; has been freed. Set carry'
 		ex	af,af'			; to ensure that file size
 		jr	first_cluster		; is updated.
@@ -762,8 +678,8 @@ new_size_zero:	exx				;DE':BC' = -1 => file size 0
 		ex	af,af'			;Set NZ' to ensure that
 						; file size is updated later.
 		pop	hl		   ;LV2	;Get unit descriptor back
-		ld	e,(ix+FAB_FPC##)	;Free the whole cluster
-		ld	d,(ix+FAB_FPC##+1)	; chain for the file, if
+		ld	e,(ix+FAB_FIRST_PHYSICAL_CLUSTER##)	;Free the whole cluster
+		ld	d,(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1)	; chain for the file, if
 		ld	a,d			; there is one.
 		or	e
 		pcall	nz,FR_CHAIN
@@ -796,17 +712,17 @@ ret_err_1:	pop	de		   ;LV1	;Clean up stack before
 ;
 ;
 ;
-first_cluster:	ld	(ix+FAB_FPC##),c	;For new file, store the first
-		ld	(ix+FAB_FPC##+1),b	; cluster in FAB for writing
+first_cluster:	ld	(ix+FAB_FIRST_PHYSICAL_CLUSTER##),c	;For new file, store the first
+		ld	(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1),b	; cluster in FAB for writing
 						; to directory entry later.
 		xor	a
-		ld	(ix+FAB_LPC##),c	;Also store as last cluster
-		ld	(ix+FAB_LPC##+1),b	; accessed (both physical and
-		ld	(ix+FAB_LLC##),a	; logical) since file is not
-		ld	(ix+FAB_LLC##+1),a	; null any more. (A=0)
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##),c	;Also store as last cluster
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##+1),b	; accessed (both physical and
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##),a	; logical) since file is not
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##+1),a	; null any more. (A=0)
 ;
 ;
-extend_done:	set	AC_MOD,(ix+FAB_ACC##)	;Set the "written to" flag
+extend_done:	set	AC_MOD,(ix+FAB_ACCESS_MODE##)	;Set the "written to" flag
 		exx
 		ex	af,af'			;If file size has not increased
 		jr	nz,do_enlarge		; at all then don't alter size.
@@ -817,10 +733,10 @@ do_enlarge:	inc	bc			;If end_pointer is bigger
 		or	c			; the file size to end_pointer
 		jr	nz,no_inc32_carry	; in anticipation of the
 		inc	de			; operation working.
-no_inc32_carry:	ld	(ix+FAB_SIZE##),c	;Note the 32 bit increment
-		ld	(ix+FAB_SIZE##+1),b	; first since we had the last
-		ld	(ix+FAB_SIZE##+2),e	; byte pointer, rather than
-		ld	(ix+FAB_SIZE##+3),d	; the next byte pointer.
+no_inc32_carry:	ld	(ix+FAB_FILE_SIZE##),c	;Note the 32 bit increment
+		ld	(ix+FAB_FILE_SIZE##+1),b	; first since we had the last
+		ld	(ix+FAB_FILE_SIZE##+2),e	; byte pointer, rather than
+		ld	(ix+FAB_FILE_SIZE##+3),d	; the next byte pointer.
 ;
 no_enlarge:	pop	bc		   ;LV2	;CALCULATE OVERFLOW PAST EOF
 		pop	de			;Clean up stack
@@ -891,12 +807,12 @@ DECODE_PTR:
 ; Entry:           HL = Pointer to unit descriptor
 ;	      D:E:B:C = File pointer value
 ; Returns:          A = If Z-flag clear (NZ) - Error code (.FILE)
-;			   Z-flag set (Z) - Sector within cluster (0..UD_CMSK)
+;			   Z-flag set (Z) - Sector within cluster (0..UD_CLUSTER_MASK)
 ;		   BC = Byte offset within sector (0...1FFh)
 ;		   DE = Logical cluster number (0...07FFFh)
 ; Corrupts:   AF,BC,DE
 ;
-; Assumes:    UD_CSHFT=UD_CMSK+1
+; Assumes:    UD_CLUSTER_SHIFT=UD_CLUSTER_MASK+1
 ;
 ;
 		push	hl
@@ -909,7 +825,7 @@ DECODE_PTR:
 		rl	b			; into B and save it for
 		push	bc			; returning.
 ;
-		ld	bc,UD_CMSK##
+		ld	bc,UD_CLUSTER_MASK##
 		add	hl,bc			;Get cluster mask from unit
 		push	af			; descriptor and mask with
 		and	(hl)			; logical sector to get start
@@ -962,19 +878,19 @@ LOG_PHYS_CLU:
 ;
 		push	hl
 		ex	de,hl
-		ld	e,(ix+FAB_LPC##)	;Get last accessed physical
-		ld	d,(ix+FAB_LPC##+1)	; cluster.
+		ld	e,(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##)	;Get last accessed physical
+		ld	d,(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##+1)	; cluster.
 		ld	a,d			;If it is zero then the file
 		or	e			; has no clusters so jump
 		jr	z,null_file		; to return an error.
 ;
-		ld	c,(ix+FAB_LLC##)	;Get last accessed logical
-		ld	b,(ix+FAB_LLC##+1)	; cluster (BC).  If required
+		ld	c,(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##)	;Get last accessed logical
+		ld	b,(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##+1)	; cluster (BC).  If required
 		sbc	hl,bc			; logical cluster (HL) is the
 		jr	nc,chain_start		; same or bigger then start
 		add	hl,bc			; here. If not then start
-		ld	e,(ix+FAB_FPC##)	; from first cluster of file.
-		ld	d,(ix+FAB_FPC##+1)
+		ld	e,(ix+FAB_FIRST_PHYSICAL_CLUSTER##)	; from first cluster of file.
+		ld	d,(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1)
 chain_start:	ex	(sp),hl			;HL -> unit descriptor
 		pop	bc			;BC = cluster chain count
 ;

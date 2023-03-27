@@ -1,7 +1,8 @@
 	.z80
+	name('b2')
 BANK	equ	2
 ;
-	include	BANK.INC
-	include	B0LABELS.INC
+	include	../bank.inc
+	include	../bank0/b0labels.inc
 ;
 	end

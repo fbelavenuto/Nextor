@@ -1,10 +1,11 @@
 	.z80
+	name('data')
 	title	MSX-DOS 2 Copyright (1986)  IS Systems Ltd.
 	subttl	Page-3 Fixed System Data Area
 ;-----------------------------------------------------------------------------
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	macros.inc
+	INCLUDE	const.inc
 ;
 ;-----------------------------------------------------------------------------
 ;
@@ -107,7 +108,7 @@ ram_ad	defl	DATABASE
 
     var3    CALL_MAP    ;UNAPI RAM helper compliant routines
     var3    RD_MAP
-    var3    CALL_MAPI
+    var3    CLL_MAPI
     var3    WR_MAP
 ;
 	var1	CUR_DRV		;Current logical drive (1=A:)
@@ -165,7 +166,8 @@ ram_ad	defl	DATABASE
 	var1	TIM_TICK	;Deferred timeout counter for unit descriptor
 				; timeouts.
 ;
-	var	TIMI_SAVE,5	;Save address for old interrupt hook.
+	var	TIMI_SAVE,5	;Save address for old interrupt hook
+	                ;(in DOS 1 mode TM1_SAVE is used instead)
 ;
 	var2	MAP_TAB		;Pointer to mapper records.
 ;
@@ -217,7 +219,10 @@ ram_ad	defl	DATABASE
 	var1	MFLAGS		;Miscellaneous flags
 	const	FASTOUT,0	;bit 0: set for fast STROUT
 	const	FIRSTLD,1	;bit 1: set while booting NEXTOR.SYS for the first time
-	const	ZALLOC,2	;bit 2: reduced alloc info mode becomes zero info mode
+	const	ZALLOC,2	;bit 2: reduced alloc info mode becomes zero info mode (SET ZALLOC ON)
+	const   ERRL,3      ;bit 3: always show error messages in English (SET ERRLANG ON)
+	const   KILLD,4		;bit 4: kill DSKI and DSKO BASIC commands (SET KILLDSKIO ON)
+	const   SYST2,7     ;Bit 7: force boot in MSXDOS2.SYS (temporary, reset after read)
 	spare	1		;Available for DOS 2
 ;
 	var2	BLDCHK
@@ -268,11 +273,11 @@ ram_ad	defl	DATABASE
     const   KSLOT,P2_64K  ;Slot of disk controller being called (used in DOS 1 mode)
 ;
 	var1	NXT_VER		;Nextor version numbr
-	var1	MAIN_BANK
+	var1	MAIN_BANK	;Will be 0 in normal mode or 3 in DOS 1 mode
 	var	KERNEX,4	;Nextor kernel slots,
                     ;bit 6 is set if timer interrupt routine is to be called
 					;bit 5 is set if the driver provides configuration
-	var	_TIME_IRQ,5,F31E
+	var	TM1_SAVE,5,F31E	;Save address for old interrupt hook (used in DOS 1 mode)
 ;
 ;	------------------------
 ;
@@ -577,20 +582,6 @@ ram_ad	defl	4100h
 	var3	DEV_FORMAT
 	var0	DV_MTOFF
 	var3	DEV_CMD
-
-;-----------------------------------------------------------------------------
-;
-;	DOS 1 bank routines for interrupt management
-
-ram_ad	defl	04115h-6
-
-	var3	SET1INT
-	var3	PRV1INT
-
-;-----------------------------------------------------------------------------
-;
-;  Fields in the disk amulation mode table
-
 
 ;-----------------------------------------------------------------------------
 ;

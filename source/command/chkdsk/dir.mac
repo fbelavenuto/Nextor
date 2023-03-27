@@ -279,8 +279,8 @@ memory_ok:      ld      hl,(DIR_START##)        ;Remember start cluster for
 		pop     hl                      ;Record start cluster of 
 		ld      (DIR_PARENT##),hl       ; sub-directories parent
 ;
-		ld      l,(ix+DR_CLU)
-		ld      h,(ix+DR_CLU+1)         ;Setup DIR_START ready to
+		ld      l,(ix+DR_FIRST_CLUSTER)
+		ld      h,(ix+DR_FIRST_CLUSTER+1)         ;Setup DIR_START ready to
 		ld      (DIR_START##),hl        ; search this sub-directory.
 ;
 		ld      hl,(FILE_PTR##)         ;Store the address of this
@@ -389,13 +389,13 @@ flst_new_2:     ld      hl,ER_FLAGS##           ;If file list is not being
 		ld      (RAM_TOP##),hl          ;Record new top of RAM and 
 		ld      (FILE_PTR##),hl         ; pointer to this record.
 ;
-use_dummy_rec:  ld      a,(ix+DR_ATTR)          ;Store attributes byte in
+use_dummy_rec:  ld      a,(ix+DR_ATTRIBUTES)          ;Store attributes byte in
 		ld      (hl),a                  ; the file record.
 		inc     hl
-		ld      a,(ix+DR_CLU)
+		ld      a,(ix+DR_FIRST_CLUSTER)
 		ld      (hl),a                  ;Store this entry's cluster
 		inc     hl                      ; number in the file record.
-		ld      a,(ix+DR_CLU+1)
+		ld      a,(ix+DR_FIRST_CLUSTER+1)
 		ld      (hl),a
 		inc     hl
 ;

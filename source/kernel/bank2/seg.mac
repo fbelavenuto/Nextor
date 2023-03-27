@@ -1,10 +1,11 @@
 	.z80
+	name('seg')
 	title	MSX-DOS 2 ROM   Copyright (1986)  IS Systems Ltd.
 	subttl	Allocate or Free Mapper Segment
 ;-----------------------------------------------------------------------------
 ;
-	INCLUDE MACROS.INC
-	INCLUDE CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;-----------------------------------------------------------------------------
@@ -40,7 +41,7 @@ DO_CALL:
 
 	ld	(A_SAVE##),a
 	ld	(BK4_ADD##),ix
-	ld	ix,?C4PBK##
+	ld	ix,C4PBK##
 	ld	iy,(MASTER_SLOT##-1)
 	call	CALSLT##
 

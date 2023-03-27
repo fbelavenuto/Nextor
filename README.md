@@ -18,43 +18,31 @@ Note that there is no `master` branch, but branches for each major version of Ne
 
     * [**tools**](source/tools): The new command line tools created for Nextor.
 
-* [**wintools**](/wintools): Windows tools needed for building Nextor. Includes the source for two custom made tools: [`mknexrom`](/wintools/mknexrom.c) (C) and [`SymToEqus`](/wintools/SymToEqus.cs) (C#).
+* [**buildtools**](/buildtools): Tools needed for building Nextor on Windows (deprecated) and Linux (recommended). Includes the source for two custom made tools: [`mknexrom`](/buildtools/sources/mknexrom.c) (C) and [`SymToEqus`](/buildtools/sources/SymToEqus.cs) (C#).
 
 * [**docs**](/docs): Documentation for both users and developers.
 
 ## How to build Nextor
 
-You need:
+Nextor requires Linux to be built. It should work on macOs too, but that hasn't been tested. If you are on Windows 10 or 11 you can use [WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
 
-1. A Windows machine (if you don't have one see ["No Windows?"](#no-windows) below)
-2. SDCC ([http://sdcc.sourceforge.net](http://sdcc.sourceforge.net)), targetting the Z80 processor, to build FDISK.
-3. .NET Framework 2.0 or higher (for the `SymToEqus` tool in the `wintools` folder)
-4. The `wintools` folder must be added to the `PATH` environment variable
+To build Nextor you'll need:
 
-### To build the Nextor kernel
+* `make`. On Debian/Ubuntu-ish systems you can just `apt-get install make`.
+* [The Nestor80 tools](https://github.com/Konamiman/Nestor80). Go to [the releases section](https://github.com/Konamiman/Nestor80/releases) and download the appropriate variant of the latest version for the assembler (N80), the linker (LK80) and the library manager (LB80).
+* [SDCC](http://sdcc.sourceforge.net/) **v4.2 or newer**, for FDISK and the command line tools written in C. On Debian/Ubuntu-ish systems you can just `apt-get install sdcc`.
+* `objcopy` from [the binutils package](https://www.gnu.org/software/binutils/). On Debian/Ubuntu-ish systems you can just `apt-get install binutils`.
+* `mknexrom` to generate the ROM files with the drivers. You have it in the `buildtools/Linux` folder, but you can also build it from the source in the `buildtools/sources` directory.
 
-Run the `compile.bat` script located in the `source\kernel` folder. If the FDISK tool has not been compiled already (the `fdisk.dat` and `fdisk2.dat` files do not exist in the `bank5` folder), they will be compiled on the fly.
+Except for those obtained via `apt`, you'll need to place these tools at a suitable location to be able to use them, e.g. `/usr/bin`.
 
-The generated kernel base file and the complete ROM files will be generated in the `bin\kernels` folder. One ROM file will be generated for each folder existing in the `source\kernel\drivers` folder.
+There are five makefiles that will take care of building the different components of Nextor. Once the tools are in place you can just `cd` to the appropriate directory and run `make`:
 
-### To build the FDISK tool only
+* `source/kernel`: builds the kernel ROM files and copies them to the `bin/kernels` directory. There are handy aliases for the different ROM files, so you can run e.g. `make ide`; see the `kernels` rule at the beginning of the file for the full list.
+* `source/command/msxdos`: builds `NEXTOR.SYS` and copies it to the `bin/tools` directory.
+* `source/tools`: builds the command line tools written in assembler and copies them to the `bin/tools` directory.
+* `source/tools/C`: builds the command line tools written in C and copies them to the `bin/tools` directory.
+* `source`: this one just invokes the other four in sequence, so it builds pretty much everything. It supports `make clean` too.
 
-If you make a change in the FDISK tool, you can compile it without having to compile the full kernel again. Just run the `compile.bat` script in the `source\kernel\bank5` folder (do NOT run `compfdsk.bat`). The ROM files in `bin\kernels` will be appropriately updated.
+You may want to take a look at [this now closed pull request from Dean Netherton](https://github.com/Konamiman/Nextor/pull/79) that contains a different attempt at writing makefiles for bulding Nextor. It even has some nice extra features like building FDD and HDD images with Nextor, and building the `mknexrom` tool itself.
 
-### To build the command line tools
-
-Run the `compile.bat` script in the `source\tools` folder. The tools will be generated in the `bin\tools` folder.
-
-### To build `NEXTOR.SYS`
-
-Run the `compile.bat` script in the `source\command\msxdos` folder. The file will be generated in the `bin\tools` folder.
-
-### To build `COMMAND2.COM`
-
-Run the `compile.bat` script in the `source\command\command` folder. The file will be generated in the `bin\tools` folder.
-
-At this time there's no specific script (other than the original makefile) for building the original MSX-DOS command line tools.
-
-### No Windows?
-
-If your machine doesn't run Windows you can still build Nextor by using Xesco's [Nextor builder](https://github.com/xesco/NextorBuilder).

@@ -14,6 +14,7 @@
 
 
 	.Z80
+	name('dos1ker')
 	;ASEG
 	;ORG	04100H
 
@@ -513,9 +514,7 @@ SET_SLOT:
 	pop	iy
 	ret
 
-	ALIGN	04115h-6
-	jp	SETINT
-	jp	PRVINT
+	ALIGN	04115h
 
 ;	Subroutine	store date
 ;	Inputs		
@@ -5627,7 +5626,6 @@ A5FC2:	call	A5FCD			; get my SLTWRK entry
 ;	Inputs		-
 ;	Outputs		HL = pointer to SLTWRK entry
 
-GWORK::
 A5FCD:	call	A5FE7			; get my primairy slot
 	add	a,a
 	add	a,a
@@ -5663,55 +5661,8 @@ A5FF3:	ld	c,a
 	add	hl,bc
 	ret
 
-;	Subroutine	install my diskdriver interrupt handler
-;	Inputs		HL = pointer to interrupt handler
-;	Outputs		-
-;	Remark		used by the diskdriver
+	ALIGN	603Dh
 
-SETINT:
-A5FF6:	ld	a,(H.TIMI+0)
-	cp	0C9H
-	jr	z,A6012			; H.TIMI not hooked, skip saving H.TIMI
-	push	hl
-	ld	a,(DEVICE)		; this diskdriver number
-	ld	hl,YFB29
-	call	A5FF1
-	add	hl,bc
-	add	hl,bc			; get DRVINT pointer
-	ex	de,hl
-	ld	hl,H.TIMI+1
-	ld	c,003H
-	ldir				; save slotid and address (assumes that is hooked by a CALLF!)
-	pop	hl
-A6012:	di
-	ld	a,0F7H
-	ld	(H.TIMI+0),a
-	ld	(H.TIMI+2),hl		; diskdriver interrupt handler
-	ld	a,0C9H
-	ld	(H.TIMI+4),a
-	call	A402D
-	ld	(H.TIMI+1),a		; slotid of this diskdriver
-	ret
-
-;	Subroutine	call orginal interrupt handler
-;	Inputs		-
-;	Outputs		-
-;	Remark		used by the diskdriver
-
-PRVINT:
-A6027:	push	af
-	call	A402D			; slotid of this diskdriver
-	ld	b,4
-	ld	de,YFB29
-	ld	hl,YFB21+1
-A6033:	cp	(hl)			; is this my DRVTBL entry ?
-	jr	z,A603F			; yep, get the saved interrupt handler and jump to it
-	inc	de
-	inc	de
-	inc	de
-	inc	hl
-	inc	hl
-	djnz	A6033			; next DRVTBL and DRVINT entry
 A603D:	pop	af
 	ret				; quit
 
@@ -8845,7 +8796,7 @@ NODOS1F_LOOP:
 	ld	a,(YF306)
 	ld	c,a
 	pop	hl
-	jp	?C4PBK##
+	jp	C4PBK##
 
 NODOS1F_NEXT:
 	inc	hl
@@ -9087,7 +9038,7 @@ NEW_ERRS:
 	;many games to not work)
 
 ALLFBUF:
-	ld	a,(IN_EMU##)
+	ld	a,(IN_EMU_MODE##)
 	or	a
 	jp	z,A5EC8		;Jump to actual allocation if not in emulation mode...
 
@@ -9146,6 +9097,11 @@ RD_MEM:
 	add	hl,sp
 	push	hl
 	jp	XF36B           ; enable system diskrom
+
+	;KABR and KDERR stubs, see drv.mac for details
+
+KABR::
+KDERR::
 
 ; DRV.MAC is to be placed here.
 

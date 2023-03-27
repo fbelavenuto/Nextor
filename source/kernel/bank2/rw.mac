@@ -1,10 +1,11 @@
 	.z80
+	name('rw')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	Disk Read and Write Routines
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;------------------------------------------------------------------------------
@@ -90,27 +91,7 @@ try_rw_val:	push	bc			;Remember sector count and 32 bit sector flag
 		res	7,c
 		inc	c			; actually checking the boot sector (B=2).
 
-		ld a,(RW_EX_PSEC##)	;When the drive has a file mounted VAL_FIB may
-		ld d,a              ;corrupt the variables we've set so far, so save them.
-		ld a,(RW_FLAGS##)
-		ld e,a
-		push de
-		ld de,(RW_PSEC##)
-		push de
-		ld de,(RW_DTA##)
-		push de
 		pcall	VAL_FIB
-		pop de
-		ld (RW_DTA##),de
-		pop de
-		ld (RW_PSEC##),de
-		ld b,a
-		pop de
-		ld a,e
-		ld (RW_FLAGS##),a
-		ld a,d
-		ld (RW_EX_PSEC##),a
-		ld a,b
 
 		pop	bc			;B := sector count, C:7 set if 24 or 32 bit sector number
 		or	a
@@ -153,6 +134,12 @@ abs_common_doerr:
 		jr	try_rw_val
 
 abs_rw_dorw:
+		push de		;If writing, reset number of next cluster to allocate
+		bit	RF_READ,(iy+@RW_FLAGS##) ;just in case we're messing up with FAT
+		ld de,1
+		pcall z,ACLU_SET
+		pop de
+
 		pcall	FL_UD			;Flush and invalidate any
 		pcall	INV_UD			; buffers for this drive.
 ;
@@ -373,7 +360,7 @@ CORRECT_BUF:
 ; Returns:       None
 ; Corrupts:     AF,AF',BC',DE',HL'
 ;
-; Assumes:      BD_UNIT=2    BD_FLAGS=3    BD_SECT=4    BD_EX_SECT=8
+; Assumes:      BD_PHYSICAL_UNIT_NUMBER=2    BD_FLAGS=3    BD_SECTOR_NUMBER=4    BD_EX_SECTOR_NUMBER=8
 ;
 ;
 		pcall	FLG_UD			;Flag all buffers for this unit
@@ -382,12 +369,12 @@ correct_loop:	push	bc
 		exx
 		pcall	FLG_NEXT		;Get next buffer for this unit
 		jr	z,correct_done		; and jump to return if no more
-		ld	bc,BD_SECT##
+		ld	bc,BD_SECTOR_NUMBER##
 		add	hl,bc
 		ld	e,(hl)			;DE := sector number from this
 		inc	hl			;      buffer.
 		ld	d,(hl)
-		ld	bc,BD_EX_SECT##-BD_SECT##-1
+		ld	bc,BD_EX_SECTOR_NUMBER##-BD_SECTOR_NUMBER##-1
 		add	hl,bc
 		ld	a,(hl)			;A := sector number (bit16-22)
 						; from this buffer

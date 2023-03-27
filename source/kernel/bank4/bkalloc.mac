@@ -1,10 +1,11 @@
 	.z80
+	name('bkalloc')
 	title	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	subttl	Block memory allocation
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE ../macros.inc
+	INCLUDE	../const.inc
 ;
 
 ;WARNING: These routines are no longer part of Nextor as of v2.1.0.

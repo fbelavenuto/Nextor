@@ -1,10 +1,11 @@
 	.z80
+	name('kinit')
 	title	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	subttl	Main Kernel Initialisation Section
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;-----------------------------------------------------------------------------
@@ -170,7 +171,7 @@ link_dev_loop:	ld	a,(hl)			;Look at next device
 		inc	hl
 ;
 		push	hl
-		ld	hl,DD_SZ##		;Allocate RAM for another
+		ld	hl,DD_DESC_SIZE##		;Allocate RAM for another
 		call	ALL_P2			; device descriptor and
 		pop	de			; die if not enough memory.
 		ld	a,6
@@ -185,7 +186,7 @@ kinit_fail_nz:	jr	nz,kinit_fail
 		ldi				;Copy address of device
 		ldi				; handler into descriptor.
 		ex	de,hl
-		ld	bc,DD_MODE##-(DD_NEXT##+4) ;Copy the device flags and
+		ld	bc,DD_MODE##-(DD_NEXT_DESC_ADDRESS##+4) ;Copy the device flags and
 		add	hl,bc			   ; device name into the
 		ex	de,hl			   ; device descriptor.
 		ld	bc,1+8+3
@@ -203,7 +204,7 @@ link_dev_done:
 ;
 ;	+++++  SETUP SECTOR BUFFER CHAIN  +++++
 ;
-		ld	b,DEF_BUFS##		;Allocate the default number
+		ld	b,DEFAULT_SECTOR_BUFFERS##		;Allocate the default number
 		pcall	F_BUFFER		; of sector buffers.
 ;
 ;	+++++  INITIALISE FILE HANDLE SYSTEM  +++++
@@ -290,7 +291,7 @@ INIT_UNITS:
 ;   This routine creates and  initialises  all  the  unit  descriptors  for  a
 ; particular disk driver (including the RAM disk). A pointer to the MSX DPB is
 ; put in the unit descriptor.  The unit descriptor has its UD_SLOT, UD_OFFSET,
-; UD_DPB,  UD_REL and UD_PHYS fields set up and UD_CDIR is set -ve to indicate
+; UD_DPB_ADDRESS,  UD_RELATIVE_UNIT_NUMBER and UD_PHYSICAL_UNIT fields set up and UD_CURRENT_DIR_FIRST_CLUSTER is set -ve to indicate
 ; the root directory.  The rest of the unit descriptor is zeroed.   A  pointer
 ; to  the unit descriptor is store in the appropriate place in UNIT_TAB unless
 ; it is the RAM unit being initialised (physical unit zero) in which  case  it
@@ -310,7 +311,7 @@ INIT_UNITS:
 init_unit_loop:	ex	af,af'
 		push	hl			;Save entry table offset
 ;
-		ld	hl,UD_SZ##		;Allocate RAM for a unit
+		ld	hl,UD_SIZE##		;Allocate RAM for a unit
 		call	ALL_P2			; descriptor.
 		jr	nz,init_unit_fail	;Error if not enough RAM.
 		ex	de,hl			;Get UD address into DE and
@@ -323,18 +324,18 @@ init_unit_loop:	ex	af,af'
 		ld	b,(hl)			; pointer for next one.
 		inc	hl
 		push	hl			;Save new DPB pointer address
-		ld	(ix+UD_DPB##),c		;Store a pointer to the DPB
-		ld	(ix+UD_DPB##+1),b	; in the unit descriptor.
+		ld	(ix+UD_DPB_ADDRESS##),c		;Store a pointer to the DPB
+		ld	(ix+UD_DPB_ADDRESS##+1),b	; in the unit descriptor.
 ;
 		ld	a,(bc)			;Get physical unit number
 		inc	a			; from DPB and store it in
-		ld	(ix+UD_PHYS##),a	; unit descriptor after
+		ld	(ix+UD_PHYSICAL_UNIT##),a	; unit descriptor after
 		ld	l,a			; adjusting it.
 		ld	h,0			;HL := unit number (1...8)
 ;
 		inc	bc			;Get media descriptor from
 		ld	a,(bc)			; DPB and store it in the
-		ld	(ix+UD_MBYTE##),a	; unit descriptor.
+		ld	(ix+UD_MEDIA_DESC_BYTE##),a	; unit descriptor.
 ;
 		ld	bc,RM_UD##		;If physical unit is non-zero
 		jr	z,init_ramunit		; (ie. not RAM disk) then
@@ -353,12 +354,12 @@ init_ramunit:	add	hl,hl			; UNIT_TAB depending on the
 		ld	(ix+UD_OFFSET##),l	;  ..  entry table offset
 ;
 		ex	af,af'
-		ld	(ix+UD_REL##),a		;Store relative unit number
+		ld	(ix+UD_RELATIVE_UNIT_NUMBER##),a		;Store relative unit number
 		inc	a			; and increment for next time.
-		ld	(ix+UD_CDIR##+1),0FFh	;set current dir -ve => root
-		ld	(ix+UD_CDIR##),0FFh
+		ld	(ix+UD_CURRENT_DIR_FIRST_CLUSTER##+1),0FFh	;set current dir -ve => root
+		ld	(ix+UD_CURRENT_DIR_FIRST_CLUSTER##),0FFh
 ;
-		ld	(ix+UD_SEG##),0FFh
+		ld	(ix+UD_RAM_SEGMENT##),0FFh
 		djnz	init_unit_loop		;Loop for next unit
 		xor	a
 		ret				;Return with no error
@@ -620,7 +621,7 @@ kbdos_fn_ok:	ex	af,af'
 		pop	bc	;Restore original BC and HL
 		pop	hl
 		ld	c,a	
-		ld	ix,?C4PBK##
+		ld	ix,C4PBK##
 		ld	iy,(MASTER_SLOT##-1)
 		jp	CALSLT##
 
@@ -767,7 +768,7 @@ kbdos_table:
 	dw	f_invalid		; 61h (define abort routine)
 	dw	f_invalid		; 62h (define error routine)
 	dw	?F_ERROR## -OFFSET	;Get previous error code
-	dw	?F_EXPLAI##-OFFSET	;Explain error code
+	dw	?F_EXPLAIN##-OFFSET	;Explain error code
 ;
 	dw	?F_FMT##   -OFFSET	;Format a disk
 	dw	F_RAMD##			;Create or destroy RAMdisk

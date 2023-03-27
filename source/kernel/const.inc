@@ -1,4 +1,8 @@
 	.xlist
+
+MAX_UNITS	equ 	8	;Maximum number of total drives
+CHGBNK		equ		7FD0h	;Address of the bank change routine
+
 ;
 ;------------------------------------------------------------------------------
 ;
@@ -170,7 +174,7 @@ ATM_ARC equ     (1 SHL AT_ARC)
 ATM_DEV equ     (1 SHL AT_DEV)
 ;
 ;
-;                 BITS IN "FAB_ACC" ACCESS MODE BYTE
+;                 BITS IN "FAB_ACCESS_MODE" ACCESS MODE BYTE
 ;               =====================================
 ;
 AC_WR   equ     0       ;Set => Read only access

@@ -1,10 +1,11 @@
 	.z80
+	name('kbios')
 	title	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	subttl	Kernel BIOS Level Character I/O Routines
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 MSX_CHSNS	equ	0009Ch
@@ -87,7 +88,7 @@ MSX_CNSDFG	equ	0F3DEh
 		ld	a,0FFh			; return A=FFh and NZ, with
 		ret	nz			; ST_COUNT left as 1.
 ;
-		ld	a,ST_TMOUT##		;No character ready so start
+		ld	a,CONSOLE_STATUS_CHECK_TIMEOUT##		;No character ready so start
 		ld	(ST_COUNT##),a		; timeout counter going again.
 no_char_ready:	xor	a			;No character ready so return
 		ret				; A=0 and Z-flag set.

@@ -1,3 +1,4 @@
+	name('40ff')
 	aseg
 ;	org	40FFh
 	org	40FEh

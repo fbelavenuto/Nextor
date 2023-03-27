@@ -1,10 +1,11 @@
 	.z80
+	name('handles')
 	TITLE	MSX-DOS 2 KERNEL   Copyright (1986)  IS Systems Ltd.
 	SUBTTL	File Handle Functions and File Access Block Routines
 ;******************************************************************************
 ;
-	INCLUDE	MACROS.INC
-	INCLUDE	CONST.INC
+	INCLUDE	../macros.inc
+	INCLUDE	../const.inc
 	RAMMOD
 ;
 ;-----------------------------------------------------------------------------
@@ -35,8 +36,8 @@
 		bit	MD_DEV,(ix+FAB_MODE##)	;Skip if the FAB is for a
 		jr	z,wrch_disk_file	; disk file.
 ;
-		ld	l,(ix+FAB_ID##+2)	;Get jump table address
-		ld	h,(ix+FAB_ID##+3)	; into HL.
+		ld	l,(ix+FAB_VOLUME_ID##+2)	;Get jump table address
+		ld	h,(ix+FAB_VOLUME_ID##+3)	; into HL.
 		inc	hl
 		inc	hl
 		inc	hl			;HL -> WRITE routine
@@ -85,8 +86,8 @@ wrch_disk_file:	ex	af,af'
 		jr	z,rdch_disk_file	; disk file.
 ;
 		res	MD_EOF,(ix+FAB_MODE##)	;Clear end-of-file condition
-		ld	l,(ix+FAB_ID##+2)	;Get jump table address
-		ld	h,(ix+FAB_ID##+3)	; into HL.
+		ld	l,(ix+FAB_VOLUME_ID##+2)	;Get jump table address
+		ld	h,(ix+FAB_VOLUME_ID##+3)	; into HL.
 		push	bc
 		call	JP_HL			;Call the driver's RDCH
 		pop	de			; routine to read a character.
@@ -195,21 +196,21 @@ f_create_open:
 		push	de			;Copy the compatible portion
 		ex	(sp),ix			; of the FIB into the new
 		pop	hl			; FAB as a start for
-		ld	bc,FAB_FIB##		; setting it up.
+		ld	bc,FAB_END_OF_FIB##		; setting it up.
 		ldir
 		pop	bc			;Get file handle back
 		pop	de			;DE -> directory entry
 ;
-		ld	(ix+FAB_SA##),ATM_HID+ATM_SYS ;Set search attributes
+		ld	(ix+FAB_SEARCH_ATTRIBUTES##),ATM_HID+ATM_SYS ;Set search attributes
 						      ; so that any file, but
 						      ; no sub-directories
 						      ; will be found.
 ;
 		xor	a
-		ld	(ix+FAB_PTR##),a	;Set the four byte file
-		ld	(ix+FAB_PTR##+1),a	; pointer to zero in the
-		ld	(ix+FAB_PTR##+2),a	; file access block.
-		ld	(ix+FAB_PTR##+3),a
+		ld	(ix+FAB_FILE_POINTER##),a	;Set the four byte file
+		ld	(ix+FAB_FILE_POINTER##+1),a	; pointer to zero in the
+		ld	(ix+FAB_FILE_POINTER##+2),a	; file access block.
+		ld	(ix+FAB_FILE_POINTER##+3),a
 ;
 		pop	hl
 		ex	af,af'			;Get access mode byte back
@@ -272,7 +273,7 @@ open_ret_1:	pop	hl			;Return with error code
 
 		PROC	M_ENSURE
 do_ensure:	call	ENSURE_FAB		;Update dir entry if required
-		ld	a,(ix+FAB_DRV##)	;Flush any dirty buffers for
+		ld	a,(ix+FAB_DRIVE_NUMBER##)	;Flush any dirty buffers for
 		pcall	FL_LOG			; this drive.
 		xor	a
 		ret				;Return with no error.
@@ -331,8 +332,6 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 ;	
 		push	de
 		push	hl
-		ld	hl,MFLAGS##
-		set	7,(hl)
 		call	FIND_HANDLE_B		;Find the file handle and
 		pop	bc			; moan if it is invalid
 		pop	de			; or not open.
@@ -342,8 +341,6 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 		xor	a
 		pcall	RD_FAB			;Do the read operation and
 		push	bc			; return with number of bytes
-		ld	hl,MFLAGS##
-		res	7,(hl)
 		pop	hl			; read in HL.
 		ret
 ;
@@ -366,8 +363,6 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 ;
 		push	de
 		push	hl
-		ld	hl,MFLAGS##
-		set	7,(hl)
 		call	FIND_HANDLE_B		;Find the file handle and
 		pop	bc			; moan if it is invalid
 		pop	de			; or not open.
@@ -377,8 +372,6 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 		xor	a
 		pcall	WR_FAB			;Do the write operation and
 		push	bc			; return with number of bytes
-		ld	hl,MFLAGS##
-		res	7,(hl)
 		pop	hl			; written in HL.
 		ret
 ;
@@ -388,7 +381,7 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 	PROC	F_SEEK
 ;
 ;    This routine does the "move file handle pointer" KBDOS function call.  It
-; simply  locates  the FAB for this file handle and modifies the FAB_PTR field
+; simply  locates  the FAB for this file handle and modifies the FAB_FILE_POINTER field
 ; according to the offset and method code passed.
 ;
 ; Entry:       B = File handle
@@ -417,26 +410,26 @@ do_ensure:	call	ENSURE_FAB		;Update dir entry if required
 		ld	bc,0			;Jump with BC:HL=0 if offset
 		or	a			; is from start of the file.
 		jr	z,seek_got_start
-		ld	l,(ix+FAB_PTR##)
-		ld	h,(ix+FAB_PTR##+1)
-		ld	c,(ix+FAB_PTR##+2)	;Jump with BC:HL = current
-		ld	b,(ix+FAB_PTR##+3)	; position if offset if from
+		ld	l,(ix+FAB_FILE_POINTER##)
+		ld	h,(ix+FAB_FILE_POINTER##+1)
+		ld	c,(ix+FAB_FILE_POINTER##+2)	;Jump with BC:HL = current
+		ld	b,(ix+FAB_FILE_POINTER##+3)	; position if offset if from
 		dec	a			; current position.
 		jr	z,seek_got_start
-		ld	l,(ix+FAB_SIZE##)
-		ld	h,(ix+FAB_SIZE##+1)	;Else set BC:HL = file size
-		ld	c,(ix+FAB_SIZE##+2)	; if offset is from end of
-		ld	b,(ix+FAB_SIZE##+3)	; the file.
+		ld	l,(ix+FAB_FILE_SIZE##)
+		ld	h,(ix+FAB_FILE_SIZE##+1)	;Else set BC:HL = file size
+		ld	c,(ix+FAB_FILE_SIZE##+2)	; if offset is from end of
+		ld	b,(ix+FAB_FILE_SIZE##+3)	; the file.
 seek_got_start:
 		add	hl,de			;Add low word of offset to
 		ex	(sp),hl			; base and get result into
 		pop	de			; register DE.
 		adc	hl,bc			;Add high word of offset
 		ex	de,hl			; to base and get whole
-		ld	(ix+FAB_PTR##),l	; result into DE:HL.
-		ld	(ix+FAB_PTR##+1),h
-		ld	(ix+FAB_PTR##+2),e	;Store the new file pointer
-		ld	(ix+FAB_PTR##+3),d	; and return with no error.
+		ld	(ix+FAB_FILE_POINTER##),l	; result into DE:HL.
+		ld	(ix+FAB_FILE_POINTER##+1),h
+		ld	(ix+FAB_FILE_POINTER##+2),e	;Store the new file pointer
+		ld	(ix+FAB_FILE_POINTER##+3),d	; and return with no error.
 		xor	a
 		ret
 ;
@@ -478,8 +471,8 @@ seek_got_start:
 		ret	z
 		ex	af,af'
 ;
-		ld	l,(ix+FAB_ID##+2)	;HL -> device jump table
-		ld	h,(ix+FAB_ID##+3)	;      in anticipation.
+		ld	l,(ix+FAB_VOLUME_ID##+2)	;HL -> device jump table
+		ld	h,(ix+FAB_VOLUME_ID##+3)	;      in anticipation.
 ;
 		or	a
 		jr	z,get_handle_mode	;Get file handle info
@@ -513,11 +506,11 @@ get_handle_mode:ld	e,(ix+FAB_MODE##)	;Get mode flags into register
 		bit	MD_DEV,e		; file handle.
 		ret	nz
 ;
-chk_file_end:	ld	e,(ix+FAB_DRV##)	;E := logical drive number
+chk_file_end:	ld	e,(ix+FAB_DRIVE_NUMBER##)	;E := logical drive number
 		dec	e			;     (0=>A: etc).
 		ld	b,4
-test_eof_loop:	ld	a,(ix+FAB_PTR##+3)	;Loop to compare the file
-		cp	(ix+FAB_SIZE##+3)	; pointer with the file size
+test_eof_loop:	ld	a,(ix+FAB_FILE_POINTER##+3)	;Loop to compare the file
+		cp	(ix+FAB_FILE_SIZE##+3)	; pointer with the file size
 		jr	c,not_file_eof		; and set the EOF bit if the
 		jr	nz,is_file_eof		; pointer is at or beyond the
 		dec	ix			; end of the file.
@@ -529,7 +522,7 @@ not_file_eof:	xor	a
 ;
 ;	----------------------------------------
 ;
-chk_in_status:	bit	AC_RD,(ix+FAB_ACC##)	;Never ready from input if
+chk_in_status:	bit	AC_RD,(ix+FAB_ACCESS_MODE##)	;Never ready from input if
 		jr	nz,status_not_rdy	; open in write only mode
 		bit	MD_DEV,(ix+FAB_MODE##)
 		jr	nz,chk_dev_status
@@ -539,7 +532,7 @@ chk_in_status:	bit	AC_RD,(ix+FAB_ACC##)	;Never ready from input if
 		ld	e,0
 		ret
 ;
-chk_out_status:	bit	AC_WR,(ix+FAB_ACC##)	;Never ready for output if
+chk_out_status:	bit	AC_WR,(ix+FAB_ACCESS_MODE##)	;Never ready for output if
 		jr	nz,status_not_rdy	; open in read only mode
 		inc	hl
 		inc	hl			;Adjust HL for WRST device
@@ -614,7 +607,7 @@ screen_sz_dev:	ld	bc,3*4			;For a device, ask the device
 		call	CHECK_REDIR		; if required.
 ;
 		call	ENSURE_FAB_1		;Update and find the directory
-		set	AC_DEAD,(ix+FAB_ACC##)	; entry for this FAB and mark
+		set	AC_DEAD,(ix+FAB_ACCESS_MODE##)	; entry for this FAB and mark
 		or	a			; it as dead now.
 		ret	nz
 ;
@@ -790,7 +783,7 @@ FATTR3:
 		ret	nz
 ;
 		pcall	DI_SAME			;Get the directory entry back
-		ld	hl,DR_ATTR##		; and extract the attributes
+		ld	hl,DR_ATTRIBUTES##		; and extract the attributes
 		add	hl,de			; byte from it.
 		ld	l,(hl)
 		xor	a
@@ -840,7 +833,7 @@ FATTR3:
 		ret	nz			; and moan if error.
 		call	REOPEN_FAB		;Update the FAB
 ;
-get_hattrs:	ld	l,(ix+FAB_ATTR##)	;Get the attributes byte
+get_hattrs:	ld	l,(ix+FAB_ATTRIBUTES##)	;Get the attributes byte
 		xor	a			; from the file access block
 		ret				; and return with no error.
 ;
@@ -892,7 +885,7 @@ FTIME3:
 		ret	nz			; error.
 ;
 		pcall	DI_SAME			;Get the directory entry back
-		ld	hl,DR_TIME##		; and extract the date and
+		ld	hl,DR_UPDATED_TIME##		; and extract the date and
 		add	hl,de			; time from it into DE and
 		ld	e,(hl)			; HL for return.
 		inc	hl
@@ -953,10 +946,10 @@ FTIME3:
 		ret	nz			; in the directory entry and
 		call	REOPEN_FAB		; update the FAB if OK.
 ;
-get_hdate_time:	ld	e,(ix+FAB_TIME##)	;Get date and time into
-		ld	d,(ix+FAB_TIME##+1)	; DE and HL from the file
-		ld	l,(ix+FAB_DATE##)	; access block, and return
-		ld	h,(ix+FAB_DATE##+1)	; with no error.
+get_hdate_time:	ld	e,(ix+FAB_MODIFIED_TIME##)	;Get date and time into
+		ld	d,(ix+FAB_MODIFIED_TIME##+1)	; DE and HL from the file
+		ld	l,(ix+FAB_MODIFIED_DATE##)	; access block, and return
+		ld	h,(ix+FAB_MODIFIED_DATE##+1)	; with no error.
 		xor	a
 		ret
 ;
@@ -1018,7 +1011,7 @@ no_handle_match:xor	a			;If there is no match then
 ;	     B = Parent process id (if A=0)
 ;
 ;
-		ld	hl,MAX_HAND##+1		;Allocate another file handle
+		ld	hl,MAX_FILE_HANDLES##+1		;Allocate another file handle
 		add	hl,hl			; vector and give up if not
 		pcall	ALL_P2			; enough memory.
 		ret	nz
@@ -1033,7 +1026,7 @@ no_handle_match:xor	a			;If there is no match then
 		jr	z,no_inheritance	; to inherit anything.
 ;
 		inc	de
-		ld	b,MAX_HAND##		;Loop to duplicate any file
+		ld	b,MAX_FILE_HANDLES##		;Loop to duplicate any file
 inherit_loop:	push	bc			; handles which want to be
 		inc	hl			; inherited.
 		inc	de
@@ -1047,7 +1040,7 @@ inherit_loop:	push	bc			; handles which want to be
 ;
 		push	bc
 		pop	ix			;Skip if this file access
-		bit	AC_INH,(ix+FAB_ACC##)	; block doesn't want to
+		bit	AC_INH,(ix+FAB_ACCESS_MODE##)	; block doesn't want to
 		jr	z,dont_inherit		; be inherited.
 ;
 		call	INC_FAB_REF		;Bump the reference count but
@@ -1158,7 +1151,7 @@ close_hand_lp1:	pop	hl			;Get pointer to next "freed
 		ld	d,(hl)			; "freed vector".
 		push	de
 
-		ld	b,MAX_HAND##
+		ld	b,MAX_FILE_HANDLES##
 close_hand_lp2:	inc	hl
 		ld	e,(hl)			;Walk through this file
 		inc	hl			; handle vector looking
@@ -1298,7 +1291,7 @@ FIND_HANDLE_B:
 ;
 ;
 		ld	a,b			;Return with carry clear
-		cp	MAX_HAND##		; if file handle number is
+		cp	MAX_FILE_HANDLES##		; if file handle number is
 		jr	nc,find_hand_inv	; totally stupid
 ;
 		ld	hl,(HANDLES##)		;Also return NC if there
@@ -1347,10 +1340,10 @@ INC_FAB_REF:
 ; Corrupts:   AF
 ;
 ;
-		ld	a,(ix+FAB_CNT##)	;Bump the file access block's
+		ld	a,(ix+FAB_REFERENCE_COUNT##)	;Bump the file access block's
 		inc	a			; reference count but don't
 		jr	z,dont_inc_ref		; let it wrap around.
-		ld	(ix+FAB_CNT##),a
+		ld	(ix+FAB_REFERENCE_COUNT##),a
 		xor	a
 		ret
 ;
@@ -1375,8 +1368,8 @@ DEC_FAB_REF:
 ; Corrupts:   AF
 ;
 ;
-		dec	(ix+FAB_CNT##)		;Decrement the reference
-		ld	a,(ix+FAB_CNT##)	; count by one and return
+		dec	(ix+FAB_REFERENCE_COUNT##)		;Decrement the reference
+		ld	a,(ix+FAB_REFERENCE_COUNT##)	; count by one and return
 						; if it is not zero.
 		ret	nz
 ;
@@ -1384,7 +1377,7 @@ DEC_FAB_REF:
 		push	bc
 		push	ix
 		ex	(sp),hl
-		ld	bc,FAB_NEXT##		;Point DE to the start of
+		ld	bc,FAB_NEXT_ADDRESS##		;Point DE to the start of
 		add	hl,bc			; the file access block
 		ex	de,hl			; in the chain.
 		ld	hl,FAB_CHAIN##		;HL -> start of chain
@@ -1444,7 +1437,7 @@ unlink_loop:	ld	e,(hl)			; for the one we want to
 NEW_FAB:
 ;
 ;    This  routine  is  called to allocate a new file access block and link it
-; into the chain.  Only the "FAB_NEXT" and "FAB_COUNT" fields are  set  up  by
+; into the chain.  Only the "FAB_NEXT_ADDRESS" and "FAB_COUNT" fields are  set  up  by
 ; this routine.
 ;
 ; Entry:     None
@@ -1453,7 +1446,7 @@ NEW_FAB:
 ; Corrupts:  AF,HL
 ;
 ;
-		ld	hl,FAB_SZ##		;Allocate RAM for the FAB
+		ld	hl,FAB_DESC_SIZE##		;Allocate RAM for the FAB
 		pcall	ALL_P2			; and give up if there is
 		ret	nz			; none spare.
 ;
@@ -1548,19 +1541,19 @@ OLD_FAB:
 		xor	a			; the descriptor.
 		ret
 ;
-old_fab_not_dev:ld	c,(ix+FAB_DRV##)	;Validate the drive and
+old_fab_not_dev:ld	c,(ix+FAB_DRIVE_NUMBER##)	;Validate the drive and
 		ld	b,1			; give up if any error.
 		pcall	VAL_FIB
 		or	a
 		ret	nz
 ;
-		ld	e,(ix+FAB_FDC##)	;Get first directory cluster
-		ld	d,(ix+FAB_FDC##+1)	; and store it ready to start
+		ld	e,(ix+FAB_FIRST_DIR_CLUSTER##)	;Get first directory cluster
+		ld	d,(ix+FAB_FIRST_DIR_CLUSTER##+1)	; and store it ready to start
 		ld	(DE_START##),de		; a directory search
 ;
 		push	ix
 		ex	(sp),hl			;Point DE at the filename
-		ld	bc,FAB_NAME##		; in the FAB and expand
+		ld	bc,FAB_FILENAME##		; in the FAB and expand
 		add	hl,bc			; it into "FNAME_BUF" ready
 		ld	(STR_PTR##),hl		; for searching for a match
 		pop	hl			; with it.
@@ -1601,10 +1594,10 @@ find_fab_ret:	or	a			; in the FAB and return
 ;
 ;
 		xor	a			;Return immediately if
-		bit	AC_MOD,(ix+FAB_ACC##)	; file has not been
+		bit	AC_MOD,(ix+FAB_ACCESS_MODE##)	; file has not been
 		ret	z			; written to.
 ;
-ENSURE_FAB_1:	bit	AC_DEAD,(ix+FAB_ACC##)	;Winge if someone has deleted
+ENSURE_FAB_1:	bit	AC_DEAD,(ix+FAB_ACCESS_MODE##)	;Winge if someone has deleted
 		ld	a,.HDEAD##		; the file on us.
 		ret	nz
 ;
@@ -1614,25 +1607,25 @@ ENSURE_FAB_1:	bit	AC_DEAD,(ix+FAB_ACC##)	;Winge if someone has deleted
 		bit	MD_DEV,(ix+FAB_MODE##)	;Do nothing except return
 		ret	nz			; A=0 if it is a device FAB.
 ;
-		bit	AC_MOD,(ix+FAB_ACC##)	;Also do nothing if it has
+		bit	AC_MOD,(ix+FAB_ACCESS_MODE##)	;Also do nothing if it has
 		ret	z			; not been written to.
 ;
 		pcall	DATE_TIME		;Update date and time in
 						; directory entry.
 		push	ix
 		ex	(sp),hl
-		ld	bc,FAB_SIZE##		;DE -> file size in FAB
+		ld	bc,FAB_FILE_SIZE##		;DE -> file size in FAB
 		add	hl,bc			;      used below.
 		ex	de,hl
 ;
-		ld	bc,DR_ATTR##		;Set the archive bit in
+		ld	bc,DR_ATTRIBUTES##		;Set the archive bit in
 		add	hl,bc			; directory entry since file
 		set	AT_ARC,(hl)		; has been altered.
 ;
-		ld	bc,DR_CLU##-DR_ATTR##
+		ld	bc,DR_FIRST_CLUSTER##-DR_ATTRIBUTES##
 		add	hl,bc
-		ld	c,(ix+FAB_FPC##)	;Copy the first cluster
-		ld	b,(ix+FAB_FPC##+1)	; number from the FAB
+		ld	c,(ix+FAB_FIRST_PHYSICAL_CLUSTER##)	;Copy the first cluster
+		ld	b,(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1)	; number from the FAB
 		ld	(hl),c			; into the directory
 		inc	hl			; entry.
 		ld	(hl),b
@@ -1652,13 +1645,13 @@ ENSURE_FAB_1:	bit	AC_DEAD,(ix+FAB_ACC##)	;Winge if someone has deleted
 ;
 REOPEN_FAB:	pcall	DI_SAME			;Make sure entry is still
 						; buffered and DE points to it.
-		ld	a,(ix+FAB_ACC##)	;Use same access mode
+		ld	a,(ix+FAB_ACCESS_MODE##)	;Use same access mode
 ;
 	PROC	OPEN_FAB
 ;
 ;    This routine is given a file access block and a directory  entry  and  it
 ; sets  up  the  file  access block for accessing that particular file.  It is
-; assumed that the "FAB_DRV", "FAB_ID" and "FAB_MODE" fields are already  set
+; assumed that the "FAB_DRIVE_NUMBER", "FAB_VOLUME_ID" and "FAB_MODE" fields are already  set
 ; up and this routine sets up the remaining fields.  It must also be passed a
 ; set of file access flags which will be stored in the  FAB.   The  directory
 ; variables  must  be  set  up for the correct directory entry unless it is a
@@ -1678,32 +1671,32 @@ REOPEN_FAB:	pcall	DI_SAME			;Make sure entry is still
 		ex	af,af'
 ;
 		and	00000111b		;Record the access mode byte
-		ld	(ix+FAB_ACC##),a	; in the FAB.
+		ld	(ix+FAB_ACCESS_MODE##),a	; in the FAB.
 ;
-		ld	(ix+FAB_UD##),l		;Record the unit descriptor
-		ld	(ix+FAB_UD##+1),h	; address, directory sector and
+		ld	(ix+FAB_UNIT_DESCRIPTOR_ADDRESS##),l		;Record the unit descriptor
+		ld	(ix+FAB_UNIT_DESCRIPTOR_ADDRESS##+1),h	; address, directory sector and
 		ld	bc,(DE_SECTOR##)	; entry number within this
-		ld	(ix+FAB_DSEC##),c	; sector.
-		ld	(ix+FAB_DSEC##+1),b	;These fields are only used in
+		ld	(ix+FAB_DIRECTORY_SECTOR##),c	; sector.
+		ld	(ix+FAB_DIRECTORY_SECTOR##+1),b	;These fields are only used in
 		ld	a,(DE_EX_SECTOR##)
-		ld	(ix+FAB_EX_DSEC##),a
+		ld	(ix+FAB_EX_DIRECTORY_SECTOR##),a
 		ld	a,(DE_ENT##)		; "FAB_SCAN" to check for the
 		sub	(iy+@DE_E_LEFT##)	; same file being accessed.
-		ld	(ix+FAB_ENT##),a
+		ld	(ix+FAB_ENTRIES_PER_SECTOR##),a
 ;
 		ld	bc,(DE_START##)		;Set the "first directory
-		ld	(ix+FAB_FDC##),c	; cluster" to the start of
-		ld	(ix+FAB_FDC##+1),b	; the appropriate directory.
+		ld	(ix+FAB_FIRST_DIR_CLUSTER##),c	; cluster" to the start of
+		ld	(ix+FAB_FIRST_DIR_CLUSTER##+1),b	; the appropriate directory.
 ;
-		ld	c,(ix+FAB_CLU##)	;Get the start cluster of
-		ld	b,(ix+FAB_CLU##+1)	; the file and store it
-		ld	(ix+FAB_FPC##),c	; in the "first physical
-		ld	(ix+FAB_FPC##+1),b	; cluster" field of the FAB.
-		ld	(ix+FAB_LPC##),c	;Also store it as "last
-		ld	(ix+FAB_LPC##+1),b	; accessed physical cluster"
+		ld	c,(ix+FAB_START_CLUSTER##)	;Get the start cluster of
+		ld	b,(ix+FAB_START_CLUSTER##+1)	; the file and store it
+		ld	(ix+FAB_FIRST_PHYSICAL_CLUSTER##),c	; in the "first physical
+		ld	(ix+FAB_FIRST_PHYSICAL_CLUSTER##+1),b	; cluster" field of the FAB.
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##),c	;Also store it as "last
+		ld	(ix+FAB_LAST_ACCESSED_PHYSICAL_CLUSTER##+1),b	; accessed physical cluster"
 		xor	a			; and set the "last accessed
-		ld	(ix+FAB_LLC##),a	; logical cluster" field
-		ld	(ix+FAB_LLC##+1),a	; to zero.
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##),a	; logical cluster" field
+		ld	(ix+FAB_LAST_ACCESSED_LOGICAL_CLUSTER##+1),a	; to zero.
 ;
 		pop	bc			;Restore BC and return
 		ret				; with A=0.
@@ -1757,15 +1750,15 @@ REOPEN_FAB:	pcall	DI_SAME			;Make sure entry is still
 		push	ix
 		pop	bc			;BC = address of this FAB
 ;
-		ld	ix,FAB_CHAIN##-FAB_NEXT##
-fab_scan_loop:	ld	l,(ix+FAB_NEXT##)	;Get next entry in FAB
-		ld	h,(ix+FAB_NEXT##+1)	; chain and jump to
+		ld	ix,FAB_CHAIN##-FAB_NEXT_ADDRESS##
+fab_scan_loop:	ld	l,(ix+FAB_NEXT_ADDRESS##)	;Get next entry in FAB
+		ld	h,(ix+FAB_NEXT_ADDRESS##+1)	; chain and jump to
 		ld	a,h			; exit with no error
 		or	l			; if it is end of chain.
 		jr	z,no_fab_match
 ;
 		push	de
-		ld	de,-FAB_NEXT##		;Set IX to point to the FAB
+		ld	de,-FAB_NEXT_ADDRESS##		;Set IX to point to the FAB
 		add	hl,de			; for this entry in the
 		pop	de			; chain (offset is for link
 		push	hl			; and reference count).
@@ -1813,23 +1806,23 @@ no_fab_match:	push	bc
 ;
 		ld	a,(DE_ENT##)		;Return with no match if it is
 		sub	(iy+@DE_E_LEFT##)	; not the same entry within
-		cp	(ix+FAB_ENT##)		; the directory sector.
+		cp	(ix+FAB_ENTRIES_PER_SECTOR##)		; the directory sector.
 		ret	nz
 ;
 		push	hl
 		ld	hl,(DE_SECTOR##)	;Return with no match if it
 		ld	a,(DE_EX_SECTOR##)
-		ld	e,(ix+FAB_DSEC##)	; is not the same directory
-		ld	d,(ix+FAB_DSEC##+1)	; sector number.
+		ld	e,(ix+FAB_DIRECTORY_SECTOR##)	; is not the same directory
+		ld	d,(ix+FAB_DIRECTORY_SECTOR##+1)	; sector number.
 		;assume Cy=0 (check "ret nz")
 		sbc	hl,de
 		pop hl
 		ret nz
-		sub	(ix+FAB_EX_DSEC##)
+		sub	(ix+FAB_EX_DIRECTORY_SECTOR##)
 		ret	nz
 ;
-		ld	e,(ix+FAB_UD##)		;Return with no match if it is
-		ld	d,(ix+FAB_UD##+1)	; not the same unit descriptor
+		ld	e,(ix+FAB_UNIT_DESCRIPTOR_ADDRESS##)		;Return with no match if it is
+		ld	d,(ix+FAB_UNIT_DESCRIPTOR_ADDRESS##+1)	; not the same unit descriptor
 		xor	a			; address, and with a match
 		sbc	hl,de			; if it is the same.
 		add	hl,de
@@ -1837,12 +1830,12 @@ no_fab_match:	push	bc
 ;
 		push	hl
 		push	bc
-		ld	hl,UD_ID##		;Return with no match if it is
+		ld	hl,UD_VOLUME_ID##		;Return with no match if it is
 		add	hl,de			; not the same volume id.
 		ex	de,hl			;DE -> volume id of UD.
 		push	ix
 		pop	hl
-		ld	bc,FAB_ID##		;HL -> volume id of FAB.
+		ld	bc,FAB_VOLUME_ID##		;HL -> volume id of FAB.
 		add	hl,bc
 		PCALL	CP_VOLID
 		pop	bc
