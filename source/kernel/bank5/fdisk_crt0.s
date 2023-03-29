@@ -14,8 +14,9 @@ init:   ;call    gsinit
 
 	;--- Prepare parameters for main
 
-		push	hl
-        push    bc
+		ex de,hl
+		push bc
+		pop hl
 
         ;--- Step 3: Call the "main" function
 
@@ -28,8 +29,6 @@ init:   ;call    gsinit
 
 	;--- Terminate program
 
-	pop	af
-	pop af
 	ret
 
         ;--- Program code and data (global vars) start here
