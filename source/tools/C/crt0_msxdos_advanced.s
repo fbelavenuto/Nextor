@@ -114,9 +114,8 @@ parloopend:
         ;* Command line processing done. Here, C=number of parameters.
 
 cont:   ld      hl,#0x100
-        ld      b,#0
-        push    bc      ;Pass info as parameters to "main"
-        push    hl
+        ld      d,#0
+        ld      e,c      ;Pass info as parameters to "main"
 
         ;--- Step 3: Call the "main" function
 	push de

@@ -4,6 +4,7 @@
 ;
 	INCLUDE	../condasm.inc
 	INCLUDE ../const.inc
+	INCLUDE ../macros.inc
 ;
 ;	Conditional assembly switch
 ;
