@@ -627,21 +627,17 @@ CHECK_IS_RUSSIAN: ; in case of ZF
     ret
 
 
-    ;Read key status from RAM.
+    ;Read boot key status from RAM.
     ;Out: Z if status read ok, NZ if not
     ;     BEDLH = same as SCANKEYS (if Z)
 
 SCANKEYS_RAM:
     ld b,a
-    ld hl,SCANKEYS_RAM_BASE
-    ld de,RAMKEYSIG
-    call STRCOMP
+    call SCANKEYS_RAM_AVAILABLE
     ld a,b
     ret nz
 
     push af
-    xor a
-    ld (SCANKEYS_RAM_BASE),a
     ld a,(SCANKEYS_RAM_BASE+17) ;After signature, which is 17 bytes long including terminator
     ld b,a
     ld de,(SCANKEYS_RAM_BASE+18)
@@ -650,6 +646,13 @@ SCANKEYS_RAM:
     ret
 
 RAMKEYSIG: db "NEXTOR_BOOT_KEYS",0
+RAMKEYSIG_END:
+
+	;Return Z if boot keys information is available in RAM.
+SCANKEYS_RAM_AVAILABLE:
+	ld hl,SCANKEYS_RAM_BASE
+	ld de,RAMKEYSIG
+	jp STRCOMP
 
 	ALIGN	436Ch
 FDEL:	CALLDOS	13h	;;Delete file (FCB)
@@ -817,7 +820,7 @@ endif
 	call	CHK_DRIVER	;Does not return if driver not present
 
 	call	GET_DISKID_HL	;(This part removed to allow SHIFT+4)
-	ld	a,(hl)	; (DISKID)	;Am I supposed to be the master?
+	ld	a,(hl)				;Am I supposed to be the master?
 	or	a
 if STURBO
 	jp	m,KILL_DISK
@@ -855,7 +858,7 @@ endif
     and 00010000b
 	di
 	rrca
-	jr	z,NOTKILL	;If SHIFT key is pressed, kill the disk system
+	jr	z,NOTKILL	;If SHIFT key is pressed, kill the disk system (from the point of view of MSX-DOS kernels)
 ;
 KILL_DISK:
 	ld	a,(DISKID)
@@ -865,7 +868,7 @@ KILL_DISK:
 NOFFKILL:
 	ld	(PROCNM+8),a
 	ld	b,a
-	ld	a,-1		;Kill the entire disk system.
+	ld	a,-1		;Kill the entire disk system (from the point of view of MSX-DOS kernels).
 	ld	(DISKID),a
 	ld	a,b
 	inc	a
@@ -954,6 +957,13 @@ VER_CHK:
 	ld	a,(NXT_VER##)	;If previous master is MSX-DOS (not Nextor) then I become master.
 	or	a
 	jr	z,MAST_OK
+
+	ld b,a	;If previous master is Nextor v2, disable myself.
+	and 0F0h
+	cp 20h
+	ret z
+	ld a,b
+
 	cp	16*MAIN_NEXTOR_VERSION##+SEC_NEXTOR_VERSION_HIGH##	;If old master is same or newer than I
 	jr	nc,SLAVE	; become its slave.
 ;
@@ -977,6 +987,22 @@ OVERRIDE:
 	ld	(DOS_VER##),a	;set new DOS version
 	ld	a,16*MAIN_NEXTOR_VERSION##+SEC_NEXTOR_VERSION_HIGH##
 	ld	(NXT_VER##),a
+	
+	;Kill any Nextor v2 kernel trying to initialize after myself.
+	;We do this by using the "one time boot keys" mechanism to pretend that
+	;the user used it to disable Nextor via a simulated "N" key press.
+
+	ld de,SCANKEYS_RAM_BASE
+	ld hl,RAMKEYSIG
+	ld bc,RAMKEYSIG_END-RAMKEYSIG
+	ldir
+	ld hl,(BOOTKEYS##)
+	ld (SCANKEYS_RAM_BASE+17),hl
+	ld hl,(BOOTKEYS##+3)
+	ld (SCANKEYS_RAM_BASE+17+3),hl
+	ld a,(BOOTKEYS##+2)
+	or 80h	;Simulate "N" key
+	ld (SCANKEYS_RAM_BASE+17+2),a
 ;
 ;	Set up hook for clean up procedure
 ;
@@ -1171,13 +1197,12 @@ NOSETCONF:
 	or	a
 	jr	z,NO_DRIVE
 
-	call	GET_DISKID_HL	;ld	hl,DISKID
+	call	GET_DISKID_HL
 	inc	(hl)
 	ret
 ;
 NO_DRIVE:
-NO_DRV2:
-	call	GET_DISKID_HL	;ld	hl,DISKID	;Am I the first cartridge?
+	call	GET_DISKID_HL	;Am I the first cartridge?
 	inc	(hl)
 	dec	(hl)
 	ret	nz		;No, nothing to do.
@@ -1240,7 +1265,16 @@ CLEAN1:
 	ld	(hl),0C9h
 	inc	hl
 	djnz	CLEAN1
-	call	GET_DISKID_HL	;ld	hl,DISKID
+
+	ld hl,SCANKEYS_RAM_BASE
+	ld de,RAMKEYSIG
+	call STRCOMP
+	jr nz,NO_CLEAN_SCANKEYS_RAM	
+	xor a
+	ld (SCANKEYS_RAM_BASE),a
+NO_CLEAN_SCANKEYS_RAM:
+
+	call	GET_DISKID_HL
 	ld	a,(hl)
 	ld	(hl),b		;clear DEVICE
 	or	a		;disk system still alive?
