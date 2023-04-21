@@ -54,7 +54,7 @@ ORIGIN	equ	7700h
 
 ;This routine is invoked in disk emulation mode prior to any disk access.
 ;If checks if a valid file change key is being pressed, and if so,
-;reloads the emulation data file and updates the information in DVB_TABLE.
+;reloads the emulation data file and updates the information in KERNEX_DOS1.
 ;If no suitable key is being pressed, or if change is performed ok, returns Z.
 ;If there is an error reading the emulation data file, returns NZ and A=Error code.
 
@@ -73,7 +73,7 @@ CHGFILE:
 	ret
 
 CHGF2:
-	ld	ix,(DVB_TABLE##)
+	ld	ix,(KERNEX_DOS1##)
 
     call GETCURKEY
     or a
@@ -132,7 +132,7 @@ CHGF3:
 	ld	(TMP_SEC##+2),hl
 
 	ld	iy,(0F348h-1)	;Master controller slot
-	ld	hl,DEV_RW##
+	ld	hl,DRIVER.READ_WRITE##
 	ld	(BK4_ADD##),hl
 	ld	c,b
 	ld	b,1
@@ -295,7 +295,7 @@ DIRCALL:
 DO_DIRCALL:
 	pop	ix
 	push	bc
-	ld	bc,DV_D0##-DIRCALL-3
+	ld	bc,DRIVER.DIRECT_0##-DIRCALL-3
 	add	ix,bc
 	pop	bc
 	jp	DO_CALBNK
@@ -310,7 +310,7 @@ DO_DIRCALL:
 
 DIO_ENTRY::
 	push	af
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	jp	nc,DIO_ENTRY_DO
 
 	ld	a,(iy+UD1_DEVICE_INDEX##)
@@ -348,7 +348,7 @@ DIOCHGFOK:
 
 	push	hl
 	push	de
-	ld	ix,(DVB_TABLE##)
+	ld	ix,(KERNEX_DOS1##)
 	ld	e,(ix+DSK_CURRENT_FILE_SECTORS_COUNT##)
 	ld	d,(ix+DSK_CURRENT_FILE_SECTORS_COUNT##+1) ;DE = dsk size in sectors
 
@@ -392,7 +392,7 @@ WVDP:
 
 DIOEN2:
 	push	af
-    ld iy,(DVB_TABLE)
+    ld iy,(KERNEX_DOS1)
 DIOEN3:
 
     ; In this point one of these is true:
@@ -401,11 +401,11 @@ DIOEN3:
     ;   of the work area for emulation mode.
     ;
     ; - We are in normal DOS 1 mode, and IY points to the entry
-    ;   for the drive in DVB_TABLE.
+    ;   for the drive in KERNEX_DOS1.
     ;
     ; The following code is common to both cases, that's why
     ; device index, LUN index and first sector number must be stored
-    ; at the same offset in both the DVB_TABLE entries (UD1_*)
+    ; at the same offset in both the KERNEX_DOS1 entries (UD1_*)
     ; and the disk emulation work area (DSK_*).
 
 	ld	a,1
@@ -482,7 +482,7 @@ DIO_RD_LOOP:
 	ld	b,1
 	or	a
 	
-	ld	ix,DV_DSKIO##	;Or DEV_RW (they are at the same address)
+	ld	ix,DRIVER.READ_WRITE##
 	ex	af,af'
 	ld	a,DV_BANK##
 	call	CALBNK##
@@ -536,7 +536,7 @@ DIO_WR_LOOP:
 	ld	b,1
 	scf
 	
-	ld	ix,DV_DSKIO##
+	ld	ix,DRIVER.READ_WRITE##
 	ex	af,af'
 	ld	a,DV_BANK##
 	call	CALBNK##
@@ -567,7 +567,7 @@ DIO_WR_OK:
 
 DIO_NOP1:
 	pop	af
-	ld	ix,DV_DSKIO##
+	ld	ix,DRIVER.READ_WRITE##
 	call	DO_CALBNK
 	jp	CONV_ERR
 
@@ -619,7 +619,7 @@ DIO_INC_DE_DVB_END:
 	;--- Check disk change status
 
 CHG_ENTRY::
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	ld	ix,DV_CHGDSK##
 	jp	nc,DO_CALBNK
 
@@ -641,7 +641,7 @@ CHG_ENTRY::
 	ret	nz
 
 	xor	a
-	ld	ix,(DVB_TABLE##)
+	ld	ix,(KERNEX_DOS1##)
 	bit	7,(ix+EMU_DEV_AND_LUN##)
 	res	7,(ix+EMU_DEV_AND_LUN##)
 	ld	b,1
@@ -667,10 +667,10 @@ CHGEN_NOEMU:
 	ld	b,1	;"Unchanged" if partition has not changed
 	ret
 
-	;--- Obtain DPB, input: IY=Entry in DVB_TABLE, HL=Address for DPB
+	;--- Obtain DPB, input: IY=Entry in KERNEX_DOS1, HL=Address for DPB
 
 DPB_ENTRY::
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	ld	ix,DV_GETDPB##
 	jp	nc,DO_CALBNK
 
@@ -710,7 +710,7 @@ DPBEN2:
 	ld	de,TMP_SEC##
 	ld	hl,($SECBUF##)
 	or	a
-	ld	ix,DEV_RW##
+	ld	ix,DRIVER.READ_WRITE##
 	call	DO_CALBNK
 	pop	de
 	inc	de
@@ -728,7 +728,7 @@ DPBEN2:
 	;--- Format choice
 
 CHO_ENTRY::
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	ld	ix,DV_CHOICE##
 	jp	nc,DO_CALBNK
 	
@@ -738,7 +738,7 @@ CHO_ENTRY::
 	;--- Format device
 
 FMT_ENTRY::
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	ld	ix,DV_CHOICE##
 	jp	nc,DO_CALBNK
 	
@@ -749,7 +749,7 @@ FMT_ENTRY::
 	;--- Motor off
 
 MOF_ENTRY::
-	call	IS_DVB
+	call	GET_KERNEX_DOS1_PNT
 	ld	ix,DV_MTOFF##
 	jp	nc,DO_CALBNK
 
@@ -762,7 +762,7 @@ DO_CALBNK:
 
 
 	;--- Jump here when an operation is requested
-	;    on an existing, but empty, entry in DVB_TABLE
+	;    on an existing, but empty, entry in KERNEX_DOS1
 
 DISKERR:
 	ld	a,12
@@ -778,18 +778,18 @@ DIO_RNF:
 
 ;-----------------------------------------------------------------------------
 ;
-; Check if the relative drive pointer by A refers to a device-based driver
+; Check if the relative drive pointer by A refers to a Nextor driver
 ; and we are in DOS 1 mode. If so, returns Cy=1 and IY=pointer to the
-; table entry in DVB_TABLE. Otherwise returns Cy=0.
+; table entry in KERNEX_DOS1. Otherwise (DOS 2 mode, or no Nextor driver) returns Cy=0.
 ; Corrupts IY, F.
 
-IS_DVB:
+GET_KERNEX_DOS1_PNT:
 	push	af
 	ld	a,(DOS_VER##)
 	or	a
 	jr	nz,IS_NOT_DVB
 
-	ld	iy,(DVB_TABLE##)
+	ld	iy,(KERNEX_DOS1##)
 	ld a,iyh
 	or iyl
 	jr	z,IS_NOT_DVB
@@ -811,7 +811,7 @@ IS_DVB_NOEMU:
 	push	af
 	push	bc
 	ld	c,a	;C = Drive number
-	ld	b,(iy)	;B = num of entries in DVB_TABLE
+	ld	b,(iy)	;B = num of entries in KERNEX_DOS1
 	inc	iy
 
 IS_DVB_LOOP:
@@ -852,13 +852,13 @@ IS_NOT_DVB:
 ;--------------
 ;
 ; Check if we are in disk emulation mode
-; Assumes IS_DVB has returned Cy=1 (that is, in DOS 1 mode and DVB_TABLE exists)
+; Assumes GET_KERNEX_DOS1_PNT has returned Cy=1 (that is, in DOS 1 mode and KERNEX_DOS1 exists)
 ; Returns Cy=1 if in emulation mode, Cy=0 if not
 ; Corruputs: F
 
 IS_EMU:
 	push	iy
-	ld	iy,(DVB_TABLE##)
+	ld	iy,(KERNEX_DOS1##)
 	bit	7,(iy)
 	pop	iy
 	scf
@@ -868,7 +868,7 @@ IS_EMU:
 
 ;-----------------------------------------------------------------------------
 ;
-; Check if the entry of DVB_TABLE pointed by IY has a partition assigned.
+; Check if the entry of KERNEX_DOS1 pointed by IY has a partition assigned.
 ; Return A=0, Z if partition assigned; A<>0, NZ if NO partition assigned.
 
 HAS_PARTITION:
@@ -888,7 +888,7 @@ RET_NZ:
 ;-----------------------------------------------------------------------------
 ;
 ; Assign the first available FAT12 primary partition to
-; the device whose entry of DVB_TABLE pointed by IY.
+; the device whose entry of KERNEX_DOS1 pointed by IY.
 ; Returns disk error code in A, with Z appropriately set.
 ; Corrupts: AF, IX.
 
@@ -928,7 +928,7 @@ ASSIGN_PARTITION:
 
 ;-----------------------------------------------------------------------------
 ;
-; Read the MBR of the device whose entry in DVB_TABLE
+; Read the MBR of the device whose entry in KERNEX_DOS1
 ; is pointed by IY. Returns the disk error in A.
 ; Corrupts AF, BC, DE, HL, IX, IY.
 
@@ -942,7 +942,7 @@ READ_BOOT:
 	ld	de,TMP_SEC##
 	ld	hl,($SECBUF##)
 	or	a
-	ld	ix,DEV_RW##
+	ld	ix,DRIVER.READ_WRITE##
 	jp	DO_CALBNK
 
 

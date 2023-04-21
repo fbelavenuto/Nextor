@@ -266,5 +266,12 @@ CFG_DEVLUN equ 2
 
 ;-----------------------------------------------------------------------------
 ;
+
+INITXT: equ 006Ch
+LINL40: equ 0F3AEh
+
+DEFAULT_MAX_DEVICE_NUMBER: equ 4
+
+
 	.list
 ;

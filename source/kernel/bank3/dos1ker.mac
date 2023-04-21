@@ -4599,7 +4599,7 @@ A410A::	dec	c
 ;BASIC extended statement handler
 
 DRIVER_STAT:
-	ld	ix,DV_OEMST##
+	ld	ix,DRIVER.OEMSTAT##
 	ld	a,DV_BANK##
 	call	CALBNK##	;Call first the driver handler...
 	ld	a,(H.GETP+0)
@@ -9059,7 +9059,7 @@ TRRAMAD:
 	cp	3		;Turbo-R?
 	jr	nz,TRRAMEND
 	push	hl
-	ld	hl,(DVB_TABLE##)
+	ld	hl,(KERNEX_DOS1##)
 	bit	7,(hl)		;In disk emulation mode?
 	pop	hl
 	jr	z,TRRAMEND

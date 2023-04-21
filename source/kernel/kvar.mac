@@ -226,7 +226,7 @@ size	macro	name
 
 ;*****************************************************************************
 
-; Entry in the device-based drives table (pointed by DVB_TABLE) in MSX-DOS 1 mode
+; Entry in the device-based drives table (pointed by KERNEX_DOS1) in MSX-DOS 1 mode
 ;
 ; The table consists of one byte with the number of entries, followed by
 ; the entries themselves.
@@ -246,7 +246,7 @@ size	macro	name
 
 ;-----------------------------------------------------------------------------
 ;
-; Work area for the disk emulation mode (pointed by DVB_TABLE)
+; Work area for the disk emulation mode (pointed by KERNEX_DOS1)
 ;
 ; Bit 7 of DSK_CURRENT_FILE_INDEX is kept set to indicate that we are in disk emulation mode
 ; (if reset, it's the count of entries for the device-based drives table 

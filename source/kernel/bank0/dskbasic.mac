@@ -328,7 +328,7 @@ STATEMENT:
 	ei			;make sure interrupts are enabled
 ;
 	ld	a,DV_BANK##		;Call statement handler in disk driver first
-	ld	ix,DV_OEMST##
+	ld	ix,DRIVER.OEMSTAT##
 	call	CALBNK##
 	ret	nc
 

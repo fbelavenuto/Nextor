@@ -103,7 +103,7 @@ CHPUT:
 	push	hl
 	ld	d,c
 	ld	e,b
-	ld	c,0
+	ld	c,80h
 	ld	hl,($SECBUF##) ;  (BUF_3##)
 	call	F_GDRVR
 	pop	hl
@@ -356,7 +356,7 @@ DEV_READ:
 	push	hl
 
 	ld iyh,c
-	ld	ix,DEV_RW##
+	ld	ix,DRIVER.READ_WRITE##
 	ld	(BK4_ADD##),ix
 	ld	ix,CALDRV##
 
@@ -524,7 +524,7 @@ _AUTODRV:
 ; the "1" key is pressed.
 ;
 ; It does the auto-assignment of all the appropriate drives and at the
-; same time builds a table in the address stored in (DVB_TABLE), which contains
+; same time builds a table in the address stored in (KERNEX_DOS1), which contains
 ; information about the assigned device for each drive. Later, this
 ; table will be copied to an area allocated at page 3. This is necessary
 ; since DOS 1 does not allocate a data segment like DOS 2 does.
@@ -541,7 +541,7 @@ _AUTODRV:
 AUTODRV_DOS1:
     call DRVS1
 
-	ld	hl,(DVB_TABLE##)
+	ld	hl,(KERNEX_DOS1##)
 	ld	(hl),0		;start with zero entries in table
 	inc	hl
 
@@ -551,7 +551,7 @@ AUTODRV_DOS1:
 	;--- Loop through all the available drivers, and for these
 	;    of device-based type, perform an auto-assign
 
-	ld	c,1	;Driver index
+	ld	c,81h	;Driver index (+ extended driver name flag)
 AUTODRV_LOOP:
 	ld iy,($SECBUF##)
 	push	bc
@@ -590,7 +590,7 @@ AUTODRV_LOOP:
 	xor	a		;Relative drive for the driver
 
 AUTODRV_DRVLOOP:
-	;Here, IX = Beginning of entry in DVB_TABLE
+	;Here, IX = Beginning of entry in KERNEX_DOS1
 	;      IYh = Driver flags (bit 4: provides config)
 	;      IYl = Slot number
 	;      B  = Remaining drives for this driver
@@ -612,8 +612,9 @@ AUTODRV_DRVLOOP:
 	jr z,AUTODRV_DRVL2
 	push ix
 	push iy
-	ld b,1
-    ld a,b
+	ld b,c
+	ld c,1
+    ld a,c
 	call ASK_DRIVE_CONFIG
 	pop iy
 	pop ix
@@ -647,7 +648,7 @@ AUTODRV_DRVL3:
 	cp	2			;Did we enter disk emulation mode?
 	jp	z,AUTOD_EMU	;Yes: discard everything else and return
 
-	ld	hl,(DVB_TABLE##)
+	ld	hl,(KERNEX_DOS1##)
 	inc	(hl)		;Increment size of table
 	pop	ix
 	ld de,8
@@ -735,26 +736,12 @@ AUTOD_UDFND:
 AUTOD_OKNEX:
 	push	bc
 	push	hl
-	push	ix
-	call GET_DV_TYPE
-	pop	ix
-	bit	0,a
-	jr	nz,AUTOD_UDFND2
-
-	pop	hl
-	pop	bc
-	djnz	AUTOD_LOOP	;Not associated to device-based driver
-	jp	SETNUMDRV
-AUTOD_UDFND2:
 
 	;--- If the driver provides configuration, 
 	;    try to get config from the driver itself
 
-	bit 2,a
-	jr z,AUTOD_UDFND3
-
-	ld b,0
-	ld c,(ix+UD_RELATIVE_UNIT_NUMBER##)
+	ld c,0
+	ld b,(ix+UD_RELATIVE_UNIT_NUMBER##)
     ld a,1
 	call ASK_DRIVE_CONFIG
 	cp 1
@@ -856,7 +843,7 @@ SETNUMD_NOUD:
 ; This routine automatically assigns the appropriate device and partition
 ; to a drive associated to a device-based Nextor driver. It does so by
 ; searching an available block device, then searching a FAT12 or FAT16
-; partition (unless the MBR has no partition table), the checking the
+; partition (unless the MBR has no partition table), then checking the
 ; validity of the FAT boot sector. Other existing unit descriptors
 ; are checked to ensure that the same device and LUN is not assigned
 ; to more than one drive.
@@ -901,8 +888,9 @@ AAD_CURR_PART_STATUS_BYTE equ 11
 AAD_CAND_PART_DEVLUN equ 12
 AAD_CAND_PART_SECTOR equ 13
 AAD_FLAGS equ 17
+AAD_MAX_DEVICE_NUM equ 18
 
-AAD_SIZE equ 18
+AAD_SIZE equ 19
 
 AAFLAG_ENTER_EMU_MODE equ 0
 AAFLAG_IS_AUTOASPART equ 7
@@ -925,8 +913,39 @@ AUTO_ASSIGN:
     ld a,(iy+UD_SLOT##)
     ld (ix+AAD_DRIVER_SLOT),a
 
+	bit AAFLAG_IS_AUTOASPART,d
+	jr nz,DO_AUTO_COMMON
+fofo::
+	push hl
+	push bc
+	push de
+	push ix
+	ld hl,DRIVER.DRIVER_QUERY##
+	ld	(BK4_ADD##),hl
+	ld a,(iy+UD_SLOT##)
+	ld iyh,a
+	ld a,DRIVER.DRVQ_GET_MAX_DEVICE##
+	ld	ix,CALDRV##
+	call	CALSLT
+	or a
+	jr z,AUTO_ASSIGN_GOT_MAX_DEV
+	ld b,DEFAULT_MAX_DEVICE_NUMBER
+AUTO_ASSIGN_GOT_MAX_DEV:
+	pop ix
+	ld a,b
+	ld (ix+AAD_MAX_DEVICE_NUM),a
+	pop de
+	pop bc
+	pop hl
+
+	or a
+	ld a,1
+	jr z,END_AUTO_COMMON	;Error if driver says that max device number is 0
+
+DO_AUTO_COMMON:
 	call	AUTO_COMMON2
 
+END_AUTO_COMMON:
     ld ix,AAD_SIZE
     add ix,sp
     ld sp,ix
@@ -954,7 +973,6 @@ AUTO_NOEMU:
 
 ;AUTO_ASPART:	
 	ld (ix+AAD_LOOP_DEV_INDEX),b
-	ld (ix+AAD_LOOP_LUN_INDEX),c
 	xor a
 	ld (ix+AAD_CAND_PART_DEVLUN),a
 	ld (ix+AAD_CURR_PART_DEVLUN),a
@@ -967,8 +985,9 @@ AUTO_COMMON3:
 	ld (ix+AAD_CAND_PART_DEVLUN),a
 	ld (ix+AAD_CURR_PART_STATUS_BYTE),a
 
-	inc a	;Device index = 1
+	;Start at device index = 1 (A=0 then INC A)
 AA_DLOOP:
+	inc a
 	ld	(ix+AAD_LOOP_DEV_INDEX),a
 	ld	a,1	;LUN index
 AA_LLOOP:
@@ -987,11 +1006,11 @@ AA_LLOOP:
 	or	a
 	jr	nz,AA_CHKDUP_DOS2
 
-	;--- DOS 1 version: check entry in DVB_TABLE against
+	;--- DOS 1 version: check entry in KERNEX_DOS1 against
 	;    other entries in the table
 
 AA_CHKDUP_DOS1:
-	ld	iy,(DVB_TABLE##)
+	ld	iy,(KERNEX_DOS1##)
 	ld	b,(iy)
 	or	b
 	jr	z,AA_CHKDUP_OK
@@ -1068,18 +1087,20 @@ AA_CHKDUP_OK:
 
 	ld	a,(ix+AAD_DRIVER_SLOT)
 	ld iyh,a
-	ld	hl,LUN_INFO##
+	ld	hl,DRIVER.DEVICE_QUERY##
 	ld	(BK4_ADD##),hl
 	ld	hl,($SECBUF##)
 	ld	b,(ix+AAD_LOOP_LUN_INDEX)
-	ld	a,(ix+AAD_LOOP_DEV_INDEX)
+	ld	c,(ix+AAD_LOOP_DEV_INDEX)
+	ld  a,DRIVER.DEVQ_GET_PARAMS##
 	push	ix
 	ld	ix,CALDRV##
-	call	CALSLT	;Call LUN_INFO
+	call	CALSLT
 	pop	ix
-	or	a
+	call CHECK_LUN_INFO_ERROR
 	jp	nz,AA_LLOOP_NEXT	;No device/LUN available
 
+AA_OK_PARAMS:
 	ld	hl,($SECBUF##)
 	ld	a,(hl)
 	or	a
@@ -1377,12 +1398,11 @@ AA_LLOOP_NEXT:
 
 	ld	a,(ix+AAD_LOOP_LUN_INDEX)
 	inc	a
-	cp	8
+	cp	2	;TODO: was 8, remove this loop altogether
 	jp	nz,AA_LLOOP
 
 	ld	a,(ix+AAD_LOOP_DEV_INDEX)
-	inc	a
-	cp	8
+	cp  (ix+AAD_MAX_DEVICE_NUM)
 	jp	nz,AA_DLOOP
 AA_LLOOP_END:
 
@@ -1567,7 +1587,7 @@ AA_RSEC:
     or a
 AA_DOSEC:    
 	ld iyh,c
-	ld	hl,DEV_RW##
+	ld	hl,DRIVER.READ_WRITE##
 	ld	(BK4_ADD##),hl
 	ld	c,b
 	ld	b,1
@@ -2010,6 +2030,7 @@ CALC_NUMCLUS1:
 ; or directly by slot+segment pair.
 ;
 ; Entry:      C (A) = Driver index, 0 to use slot & segment number
+;                     Bit 7 is the extended driver name flag
 ;             D = Driver slot (if A=0)
 ;             E = Driver segment (FFh for ROM drivers) (if A=0)
 ;             HL = Address of buffer to put information
@@ -2024,17 +2045,22 @@ CALC_NUMCLUS1:
 ;                                    0 => Drive-based driver
 ;                             bit 1: 1 => Driver supports hot-plug devices
 ;                                    0 => Hot-plug devices not supported
-;                             bit 2: 2 => Driver provides configuration
+;                             bit 2: 1 => Driver provides configuration
 ;                                    0 => Driver does not provide configuration
 ;                             bit 7: 1 => Nextor driver
 ;                                    0 => Legacy driver (MSX-DOS 1/2.20/2.3x kernel)
 ;                     +5 (1): Driver main version number
 ;                     +6 (1): Driver secondary version number
 ;                     +7 (1): Driver revision number
-;                     +8 (32): Driver name
+;
+;                     If extended driver name flag is 0:
+;                     +8: Driver name, padded right with spaces up to 32 chars
+;                     +32-+64: zeros
+;
+;                     If extended driver name flag is 1:
+;                     +32-+64: Driver name, zero-terminated
 ;
 ; The driver name and version number are not filled for legacy drivers.
-
 
 	push	ix
 	push	iy
@@ -2047,8 +2073,13 @@ F_GDRVR_GO:
 	call	CLEAR_BUF64
 	push	hl
 
+	push ix
+	push	hl
+	pop ix
 	ld	a,c
-	or	a
+	ld (ix+8),a
+	and 7Fh
+	pop ix
 	jr	z,GDRVR_CHECK_DRVR
 
 	;--- Driver index supplied: get driver slot/segment
@@ -2148,48 +2179,81 @@ GDRVR_KERNEX_LOOP:
 
 GDRV_IS_KERNEX:
 	ld	d,a
-	push	ix
-	push	de
-	push	de
-	pop	iy
-	call GET_DV_TYPE
-	and	111b
-	or	10000000b
-	pop	iy
-	pop	ix
-	ld	(ix+4),a	;Set driver flags
+	push de
+	pop iy
+	ld	(ix+4),81h	;Set driver flags ("is Nextor" and "is device-based")
 
 	push	iy
 	push	ix
-	ld	hl,DV_VERSION##
+	ld	hl,DRIVER.DRIVER_QUERY##
 	ld	(BK4_ADD##),hl
 	ld	ix,CALDRV##
+	ld a,DRIVER.DRVQ_GET_VERSION##
 	call	CALSLT##
+	or a
+	jr z,GDRV_OK_GET_VERSION
+	ld bc,0100h
+	ld d,0
+GDRV_OK_GET_VERSION:
 	pop	ix
 	pop	iy
-	ld	(ix+5),a	;Set driver version number
-	ld	(ix+6),b
-	ld	(ix+7),c
+	ld	(ix+5),b	;Set driver version number
+	ld	(ix+6),c
+	ld	(ix+7),d
 
-	ld	hl,DV_NAME##	;Set driver name
-	ld	b,32
-GDRVR_NAME_LOOP:
 	push	iy
 	push	ix
 	push	hl
 	push	bc
-	ld	de,RDBANK##
+
+	ld a,(ix+8)
+	and 80h
+	ld d,33
+	jr z,GDRV_LEGACY_STRING_SIZE
+	ld d,64-8
+GDRV_LEGACY_STRING_SIZE:
+	push af	;Save "extended driver name" flag
+	ld (ix+8),0	;So in case of error there's an empty string
+	push ix
+	pop hl
+	ld bc,8
+	add hl,bc
+	push hl	;Save pointer to driver name
+	ld a,d
+	ld	de,DRIVER.DRIVER_QUERY##
 	ld	(BK4_ADD##),de
+	ld d,a
+	ld a,DRIVER.DRVQ_GET_STRING##
+	ld b,DRIVER.DRVQ_STR_DRIVER_NAME##
 	ld	ix,CALDRV##
 	call	CALSLT##
+
+	pop hl
+	pop bc
+	bit 7,b
+	jr nz,GDRV_END
+
+	;Convert driver name from "zero terminated" to "padded right with spaces"
+
+	ld b,32
+GDRV_ADAPT_DRIVER_NAME_LOOP:
+	ld a,(hl)
+	or a
+	jr z,GDRV_ADAPT_DRIVER_NAME_LOOP_2
+	inc hl
+	djnz GDRV_ADAPT_DRIVER_NAME_LOOP
+	jr GDRV_END
+
+GDRV_ADAPT_DRIVER_NAME_LOOP_2:
+	ld (hl),' '
+	inc hl
+	djnz GDRV_ADAPT_DRIVER_NAME_LOOP_2
+
+GDRV_END:
 	pop	bc
 	pop	hl
 	pop	ix
 	pop	iy
-	ld	(ix+8),a
-	inc	hl
-	inc	ix
-	djnz	GDRVR_NAME_LOOP
 
 	xor	a
 	ret
@@ -2473,7 +2537,7 @@ F_CDRVR_GO:
 	ld	hl,($SECBUF##)	; (BUF_3##)
 	ld	bc,8
 	add	hl,bc
-	ld	c,0
+	ld	c,80h
 	call	F_GDRVR
 	pop	ix
 	pop	bc
@@ -2740,7 +2804,7 @@ F_MAPDRV_GO:
 	jr	nz,FMPDRV2
 
 	push	hl
-	ld	hl,(DVB_TABLE##)
+	ld	hl,(KERNEX_DOS1##)
 	bit	7,(hl)
 	pop	hl
 	ld	a,.FMNT##
@@ -2922,7 +2986,7 @@ MAP_FOUND:
 	;* Now check the type of driver, if it is device-based,
 	;  perform a drive auto-assign
 
-	ld	c,0
+	ld	c,80h
 	ld	e,0FFh
 	push	hl
 	ld	hl,($SECBUF##)
@@ -2959,8 +3023,8 @@ MAP_DEF_DEVB:
 	bit 2,(iy+4)	;The drive provides configuration?
 	jr z,MAP_DEF_DEVB_NOCFG
 
-	ld b,0
-	ld c,(ix+UD_RELATIVE_UNIT_NUMBER##)
+	ld c,0
+	ld b,(ix+UD_RELATIVE_UNIT_NUMBER##)
     xor a
 	push hl
 	call ASK_DRIVE_CONFIG
@@ -3027,7 +3091,7 @@ MAP_SPECIFIC:
 	ld	a,(de)
 	ld	e,a
 	ld	d,c
-	ld	c,0
+	ld	c,80h
 	push	hl
 	ld	hl,($SECBUF##)
 	inc	h
@@ -3078,19 +3142,20 @@ MAP_SPECIFIC:
 	push	bc
 	push	iy
 
-	ld	hl,LUN_INFO##
+	ld	hl,DRIVER.DEVICE_QUERY##
 	ld	(BK4_ADD##),hl
-	ld	c,(iy)
-	ld	a,(iy+2)
+	ld	a,(iy)
+	ld	c,(iy+2)
 	ld	b,(iy+3)
-	ld iyh,c
+	ld iyh,a
 	ld	hl,($SECBUF##)
 	ld	ix,CALDRV##
+	ld a,DRIVER.DEVQ_GET_PARAMS##
 	call	CALSLT
 	pop	iy
 	pop	bc
 	pop	hl
-	or	a
+	call CHECK_LUN_INFO_ERROR
 	jp	nz,MAP_IDEVL_END
 
 	ld	ix,($SECBUF##)
@@ -3115,20 +3180,28 @@ MAP_SPECIFIC:
 	push	bc
 	push	hl
 	push	iy
-	ld	hl,DEV_STATUS##
+	ld	hl,DRIVER.DEVICE_QUERY##
 	ld	(BK4_ADD##),hl
-	ld	c,(iy)
-	ld	a,(iy+2)
-	ld	b,(iy+3)
-	ld iyh,c
+	ld	a,(iy)
+	ld	c,(iy+2)
+	ld	b,(iy+3)	;LUN
+	ld iyh,a
+	ld a,DRIVER.DEVQ_GET_STATUS##
 	ld	ix,CALDRV##
 	call	CALSLT
 	pop	iy
 	pop	hl
 	pop	bc
 
+	cp DRIVER.QUERY_NOT_IMPLEMENTED##
+	jr z,MAP_DRV_UNCH
 	or	a
-	jp	z,MAP_IDEVL_END
+	jp	nz,MAP_IDEVL_END
+
+	ld a,b
+	or a
+	jp nz,MAP_IDEVL_NDRY
+
 	dec	a
 	jr	z,MAP_DRV_UNCH
 	dec	a
@@ -3204,6 +3277,11 @@ MAP_DRV_UNCH:
 MAP_IDEVL_END:
 	ld	a,.IDEVL##
 	jp	SETNUMDRV
+
+MAP_IDEVL_NDRY:
+	ld	a,.NRDY##
+	jp	SETNUMDRV
+
 
 	;--- Mount a file
 	;    Input: DE  = Pointer to filename or FIB
@@ -3648,19 +3726,9 @@ MAPDOS1_NOUNMAP:
 MAPDOS1_DEF:
 	push hl
 	push ix
-	ld a,(ix+UD1_SLOT##)
-	ld iyh,a
-	call	GET_DV_TYPE
-	pop ix
-	pop hl
-	and 100b
-	jr 	z,MAPDOS1_DEF_NOCFG
-
-	push hl
-	push ix
-	ld c,(ix+UD1_RELATIVE_DRIVE##)
-	res	7,c	;Ignore "media changed" flag
-	ld	b,1
+	ld b,(ix+UD1_RELATIVE_DRIVE##)
+	res	7,b	;Ignore "media changed" flag
+	ld	c,1
     xor a
 	call ASK_DRIVE_CONFIG
 	pop ix
@@ -3705,7 +3773,7 @@ MAPDOS1_NODEF:
 	ld	(ix+2),0	;At the moment leave the drive unmapped
 	push	ix
 
-	ld	ix,(DVB_TABLE)
+	ld	ix,(KERNEX_DOS1)
 	inc	ix
 	ld	b,(ix-1)
 MAPDOS1_CHECK_LOOP:
@@ -3766,17 +3834,18 @@ MAPDOS1_CHK_NEXT:
 	push	ix
 	push	iy
 
-	ld	hl,LUN_INFO##
+	ld	hl,DRIVER.DEVICE_QUERY##
 	ld	(BK4_ADD##),hl
-	ld	c,(iy)
-	ld	a,(iy+2)
+	ld	a,(iy)
+	ld	c,(iy+2)
 	ld	b,(iy+3)
-	ld iyh,c
+	ld iyh,a
 	ld	hl,($SECBUF##)
 	ld	ix,CALDRV##
+	ld a,DRIVER.DEVQ_GET_PARAMS##
 	call	CALSLT
 	pop	iy
-	or	a
+	call CHECK_LUN_INFO_ERROR
 	jr	nz,MAPDOS1_IDEVL
 
 	ld	ix,($SECBUF##)
@@ -5304,7 +5373,7 @@ DRVI_NOMOUNT:
 	sbc	hl,de		;Do not get info again
 	jr	z,OK_INFO	;if it is the same driver as previous drive
 
-	xor	a
+	ld a,80h
 	ld	hl,BUF_DRIVER
 	ld	c,_GDRVR##
 	push	ix
@@ -5401,7 +5470,7 @@ TWOCRLF:
 RELUNIT_MSG:
 	db	"Relative unit ",0
 LEGACY_MSG:
-	db	"Legacy driver",0
+	db	"Legacy MSX-DOS driver",0
 DRIVE1_MSG:
 	db	"Drive ",0
 DRIVE2_MSG:
@@ -5446,6 +5515,7 @@ CDRV_BUF	equ	BUF+1
 
 CDRIVERS_MAIN_LOOP:
 	ld	a,(CDRV_INDEX)
+	or 80h	;Get extended driver name
 	ld	hl,CDRV_BUF
 	ld	c,_GDRVR##
 	call	BASIC_DOS_NE
@@ -5484,20 +5554,6 @@ OK_NAME2:
 
 	ld	hl,CRLF
 	call	PRINT
-
-
-	;* Print driver type
-
-	bit	7,(ix+4)
-	jr	z,IS_LEGACY_2
-
-	ld	hl,DEVBASED_MSG
-	bit	0,(ix+4)
-	jr	nz,PRINT_TYPE
-	ld	hl,DRVBASED_MSG
-PRINT_TYPE:
-	call	PRINT
-IS_LEGACY_2:
 
 
 	;* Print number of assigned drives
@@ -5566,14 +5622,6 @@ OK_PRINT_DRIVES:
 	jp	CDRIVERS_MAIN_LOOP
 
 
-DEVBASED_MSG:
-	db	"Type: device-based",13,10,0
-DRVBASED_MSG:
-	db	"Type: drive-based",13,10,0
-;LEGACY_MSG:
-;	db	"Legacy driver",0
-;ONSLOT_S:
-;	db	" on slot ",0
 NODRIVES_MSG:
 	db	"No drives assigned at boot time",13,10,0
 ONEDRIVE_MSG:
@@ -5596,26 +5644,22 @@ TO_MSG:
 PRINT_DRVINFO:
 	push	ix
 	pop	hl
-	ld	bc,8+31
+	ld	bc,8
 	add	hl,bc
 
-	ld	b,32+1
-SRCHBLANK:
-	ld	a,(hl)
-	dec	hl
-	dec	b
-	cp	" "
-	jr	z,SRCHBLANK
+	ld a,(hl)
+	or a
+	jr nz,PRINT_DRVNAME
+	ld hl,STR_UNNAMED_DRIVER
 
-	push	ix
-	pop	hl
-	ld	de,8
-	add	hl,de
-PRPAD:
+PRINT_DRVNAME:
 	ld	a,(hl)
+	or a
+	jr z,PRINT_DRVNAME_END
 	call	CHPUT
 	inc	hl
-	djnz	PRPAD
+	jr	PRINT_DRVNAME
+PRINT_DRVNAME_END:
 
 	ld	a," "
 	call	CHPUT
@@ -5637,7 +5681,7 @@ PRPAD:
 	or	a
 	ret	z
 
-	ld	e,"."
+	ld	a,"."
 	call	CHPUT
 
 	ld	a,(ix+7)
@@ -5646,6 +5690,8 @@ PRPAD:
 
 	ret
 
+STR_UNNAMED_DRIVER:
+	db "Unnamed driver",0
 
 ;-----------------------------------------------------------------------------
 ;
@@ -5773,7 +5819,7 @@ IS_NEX_LOOP:
 ; Modifies: AF, B, IX
 
 GET_DVB_POINTER:
-	ld	ix,(DVB_TABLE)
+	ld	ix,(KERNEX_DOS1)
 	inc	ix
 	ld	b,(ix-1)
 GET_DVB_LOOP:
@@ -5806,46 +5852,63 @@ GET_DVB_NEXT:
 
 ;-----------------------------------------------------------------------------
 ;
-	PROC	DRVS2
+	PROC	GET_BOOT_DRIVES_COUNT
 
 ;    Get the number of drives assigned to this driver at boot time in DOS 2 mode.
-;    Input: B<>0 if the driver provides configuration.
+;    Input: -
 ;    Output: A = number of drives.
 
-    push bc
     ld a,(BOOTKEYS##)   ;5 key pressed?
     and 00100000b
-    pop bc
     ld c,a
 
-	ld a,b
-	or a
-	jr z,COUNTDEVS
-
-	;If the driver provices configuration, we first try asking the driver
+	;We first try asking the driver how many drives it would like
     ;(we pass C=00100000b if "5" key is pressed)
 
     push bc
-	ld	ix,DV_CONFIG##
-	ld	a,CFG_DRVS
-	ld b,0
+	ld	ix,DRIVER.DRIVER_QUERY##
+	ld  a,DRIVER.DRVQ_GET_NUM_BOOT_DRIVES##
 	ex	af,af'
 	ld	a,DV_BANK##
 	call	CALBNK##
 	or a
+	jr nz,COUNT_DEVICES	;Interpret any error as "not implemented"
 	ld a,b
+	cp 255
+	jr z,COUNT_DEVICES
     pop bc
-	ret z
+	ret
 
     ;The driver does not provide configuration, or asking for the number of drives
 	;results in an error returned:
-	;Invoke LUN_INFO on all possible devices of the driver,
+	;Invoke DEVQ_GET_PARAMS on all possible devices of the driver,
 	;and return in A the number of devices found.
-    ;Input: C=00100000b if "5" key is pressed, C=0 otherwise
+    ;Input: (in stack) C=00100000b if "5" key is pressed, C=0 otherwise
 
-COUNTDEVS:
-    push bc
-    call COUNTDEVS0
+COUNT_DEVICES:
+
+	;First try to invoke DRVQ_GET_MAX_DEVICE to know 
+	;how many devices we should query
+
+	ld	ix,DRIVER.DRIVER_QUERY##
+	ld  a,DRIVER.DRVQ_GET_MAX_DEVICE##
+	ex	af,af'
+	ld	a,DV_BANK##
+	call	CALBNK##
+	pop de	;"5" key flag is now in E
+	or a
+	jr z,COUNTDEVS_MAX_DEV_OK
+
+	ld b,DEFAULT_MAX_DEVICE_NUMBER
+COUNTDEVS_MAX_DEV_OK:
+
+	ld a,b
+	or a
+	ret z	;Maximum device number is 0 => don't assign any device at boot time
+
+	push de
+	ld d,0
+    call COUNT_DEVICES_LOOP
     pop bc
     or a
     ret z   ;No devices found
@@ -5855,41 +5918,47 @@ COUNTDEVS:
     ld a,1  ;Only 1 device if "5" key is pressed
     ret
 
-COUNTDEVS0:
-	ld	c,0
-	ld	a,1
-COUNTDEVS1:
-	ld	b,7
-COUNTDEVS2:
-	push	af
-	push	bc
-	ld	hl,($SECBUF##)	;We don't actually need this data
-	ld	ix,LUN_INFO##
+	;Loop through DEVQ_GET_PARAMS for all device numbers, 
+	;return A=Number of devices found (devices for which no error was returned)
+	;Input: B = Max device number, D=0
+
+COUNT_DEVICES_LOOP:
+	push bc
+	push de
+	ld c,b
+	ld ix,DRIVER.DEVICE_QUERY##
+	ld a,DRIVER.DEVQ_GET_PARAMS##
+	ld hl,0
 	ex	af,af'
 	ld	a,DV_BANK##
 	call	CALBNK##
-	pop	bc
-	or	a
-	jr	nz,COUNTDEVS3
-	inc	c
-COUNTDEVS3:
-	pop	af
-	djnz	COUNTDEVS2
-	inc	a
-	cp	8
-	jr	c,COUNTDEVS1
-	ld	a,c ;!!!
+
+	pop de
+	pop bc
+	or a
+	jr z,COUNTDEVS_DEV_FOUND
+	cp DRIVER.QUERY_NOT_IMPLEMENTED##	;We count "Not implemented" error as "device exists, no info available"
+	jr nz,COUNTDEVS_DEV_NOT_FOUND
+
+COUNTDEVS_DEV_FOUND:
+	inc d
+
+COUNTDEVS_DEV_NOT_FOUND:
+	djnz COUNT_DEVICES_LOOP
+
+	ld a,d
 	ret
 
 
 ;-----------------------------------------------------------------------------
 ;
 ;    This routine is invoked right before the drive assignment process in DOS 1 mode.
-;    It scans all the available kernels and for those who are Nextor device-based
-;    and provide configuration, asks how many drives should be assigned at boot.
+;    It scans all the available kernels and for those wthat are Nextor kernels
+;    asks how many drives should be assigned at boot.
 ;    Then it updates the drives count for that kernel in DRVTBL accordingly.
 
 DRVS1:
+	;TODO: test
 	ld	hl,DRVTBL##+1
 	ld	b,4	;B=Entries in DRVTBL
 
@@ -5903,21 +5972,13 @@ DRVS1LOOP:
 	pop de
 	jr c,DRVS1NEXT	;Skip if not a Nextor kernel
 
-	ld iyh,e
-	call GET_DV_TYPE
-    bit 0,a ;Device-based?
-    jr z,DRVS1NEXT ;No: skip
-	and 100b
-	cp  100b	;Provides config?
-	jr nz,DRVS1NX3 ;No: skip but check "5" key
-
     ld a,(BOOTKEYS##)   ;5 key pressed?
     and 00100000b
     ld c,a
-	ld hl,DV_CONFIG##
+	set 0,c
+	ld hl,DRIVER.DRIVER_QUERY##
 	ld	(BK4_ADD##),hl
-	ld a,CFG_DRVS
-	ld b,1
+	ld a,DRIVER.DRVQ_GET_NUM_BOOT_DRIVES
 	ld	ix,CALDRV##
 	call	CALSLT
 	or a
@@ -6062,7 +6123,7 @@ CMIU_END:
 	;--- DOS 1 version
 
 CMIU_DOS1:
-	ld	iy,(DVB_TABLE)
+	ld	iy,(KERNEX_DOS1)
 	ld	b,(iy)
 	ld a,b
 	or a
@@ -6120,12 +6181,11 @@ CMIU1_NEXT:
 ;
 ; Invoke DRV_CONFIG in a driver to get the default device for a drive,
 ; and if the driver provides the info, invokes AUTO_ASPART.
-; Assumes that the driver is device-based and implements DRV_CONFIG.
 ;
 ; Input:  IX = Addess of unit descriptor (in DOS 2 mode) or entry in device-based drives table (in DOS 1 mode)
 ;              Must have UD_SLOT set
-;         C  = Relative unit for the drive
-;         B  = 0 for DOS 2 mode, 1 for DOS 1 mode
+;         B  = Relative unit for the drive
+;         C  = 0 for DOS 2 mode, 1 for DOS 1 mode
 ;         A  = 1 to enter disk emulation mode
 ; Output: A = 0 ok
 ;             1 driver did not provide info for that drive
@@ -6137,27 +6197,33 @@ CMIU1_NEXT:
 ; Modifies: AF, BC, DE, HL, IY
 
 ASK_DRIVE_CONFIG:
+	;TODO: test
     ld d,a
     push de
 	push bc ;BC=DOS mode and relative unit
 	ld a,(ix+UD_SLOT##)
 	ld iyh,a
-	ld hl,DV_CONFIG##
+	ld a,DRIVER.DRVQ_GET_DRIVE_BOOT_CONFIG##
+	ld hl,DRIVER.DRIVER_QUERY##
 	ld	(BK4_ADD##),hl
-	ld a,CFG_DEVLUN
 	push ix
 	ld	ix,CALDRV##
 	call	CALSLT
 	pop ix
-	pop hl	;H=DOS mode and relative unit
+	pop hl	;H=relative unit, L=DOS mode
     pop de  ;D=A at input
 	or a
+	ld a,1
+	ret nz
+	ld a,b
+	or a
+	ld a,1
 	ret nz
 
-	ld a,h
+	ld a,l
 	or a
 	jr nz,ASKDRVCFG_DOS1
-	ld (ix+UD_RELATIVE_UNIT_NUMBER##),l
+	ld (ix+UD_RELATIVE_UNIT_NUMBER##),h
 	ld (ix+UD_DEVICE_INDEX##),b
 	ld (ix+UD_LUN_INDEX##),c
 	ld (ix+UD_RAM_SEGMENT##),0FFh
@@ -6165,7 +6231,7 @@ ASK_DRIVE_CONFIG:
 	set UF_DBD,(ix+UD_DFLAGS##)
 	jr ASKDRVCFG_NEXT
 ASKDRVCFG_DOS1:
-	ld (ix+UD1_RELATIVE_DRIVE##),l
+	ld (ix+UD1_RELATIVE_DRIVE##),h
 	ld (ix+UD1_DEVICE_INDEX##),b
 	ld (ix+UD1_LUN_INDEX##),c
 ASKDRVCFG_NEXT:
@@ -6199,20 +6265,6 @@ ASKDRVCFG_GOEMU:
 
 ;----------------------------
 ;
-; Read the DV_TYPE byte from a driver
-; Input: IYh = slot number
-; Output: A = Value of DV_TYPE
-; Modifies: AF, BC, DE, HL, IX, IY
-
-GET_DV_TYPE:
-	ld	hl,RDBANK##
-	ld	(BK4_ADD##),hl
-	ld	hl,DV_TYPE##
-	ld	ix,CALDRV##
-	call	CALSLT##
-	ret
-
-
 ; Compare zero terminated strings pointed by HL and DE
 ; Return Z if they are equal, NZ if not
 ; Modifies AF, HL, DE
@@ -6226,6 +6278,22 @@ STRCOMP:
 	inc	hl
 	inc	de
 	jr	STRCOMP
+
+
+CHECK_LUN_INFO_ERROR:
+	or a
+	ret z
+	cp DRIVER.QUERY_NOT_IMPLEMENTED##
+	ret nz
+	push ix
+	ld ix,($SECBUF##)
+	ld (ix),0
+	ld (ix+1),0
+	ld (ix+2),2
+	ld (ix+7),0
+	pop ix
+	xor a
+	ret
 
 	finish <PARTIT>
 	end

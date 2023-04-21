@@ -2533,7 +2533,7 @@ rd_devcmd_routine:
 wr_devcmd_routine:
 	scf
 rdwr_devcmd:
-	ld	hl,DEV_RW##	;HL'=routine address
+	ld	hl,DRIVER.READ_WRITE##	;HL'=routine address
 	exx
 	ld	a,c		;A=required page 2 segment number
 
@@ -2585,17 +2585,24 @@ mc_devcmd_routine:
 	ret
 
 mc_devcmd_remv:
-	ld	hl,DEV_STATUS##	;HL'=routine address
+	ld	hl,DRIVER.DEVICE_QUERY##	;HL'=routine address
 	ld	a,c		;A=required page 2 segment number
 	exx
 
-	ex	af,af'
-	ld	a,(ix+UD_DEVICE_INDEX##)	;A'=Device index
-	ex	af,af'
+	ld	c,(ix+UD_DEVICE_INDEX##)	;A'=Device index
 	ld	b,(ix+UD_LUN_INDEX##)	;B=LUN index
+	ex af,af'
+	ld a,DRIVER.DEVQ_GET_STATUS##
+	ex af,af'
 	call	CALL_DRV
+	cp DRIVER.QUERY_NOT_IMPLEMENTED##
+	jr z,mc_devcmd_notchanged	;Treat "not implemented" as "unchanged"
 	or	a
-	jr	z,mc_devcmd_err
+	jr	nz,mc_devcmd_idev	;Treat any other error as "invalid device number"
+
+	ld a,b
+	or a
+	jr z,mc_devcmd_err
 
 	dec	a
 	ld	b,1
@@ -2609,10 +2616,19 @@ mc_devcmd_remv:
 	ld	b,0	;3 (or other)=unknown (translate to 0)
 	ret
 
+mc_devcmd_notchanged:
+	ld b,1
+	xor a
+	ret
+
 mc_devcmd_err:
 	ld	a,.NRDY##
 	ret
 	
+mc_devcmd_idev:
+	ld  a,.IDEVL##
+	ret
+
 	;It is not necessary to generate a DPB, since
 	;when a media change is detected, BUILD_UPB is checked,
 	;which does the DPB generation.
