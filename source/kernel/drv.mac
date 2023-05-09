@@ -113,16 +113,7 @@ CHGF3:
 
 	push	bc
 
-	ld	a,(ix+EMU_DEV_AND_LUN##) ;data file dev index + 16 * LUN index
-	ld	d,a
-	rrca
-	rrca
-	rrca
-	rrca
-	and	111b
-	ld	b,a	;LUN
-	ld	a,d
-	and	111b	;Device
+	ld	a,(ix+EMU_FILE_DEVICE_NUMBER##) ;data file dev index
 
 	ld	l,(ix+EMU_FILE_FIRST_SECTOR##)
 	ld	h,(ix+EMU_FILE_FIRST_SECTOR##+1)
@@ -134,7 +125,6 @@ CHGF3:
 	ld	iy,(0F348h-1)	;Master controller slot
 	ld	hl,DRIVER.READ_WRITE##
 	ld	(BK4_ADD##),hl
-	ld	c,b
 	ld	b,1
 	ld	hl,($SECBUF##)
 	ld	de,TMP_SEC##
@@ -157,7 +147,7 @@ CHGF3:
 	ld	a,c
     or b
 	ld	(ix+DSK_CURRENT_FILE_INDEX##),a
-	set	7,(ix+EMU_DEV_AND_LUN##) ;File changed flag
+	set	7,(ix+EMU_FILE_DEVICE_NUMBER##) ;File changed flag
 	
 	dec	a
 	add	a,a		;Each entry is 8 bytes
@@ -172,26 +162,20 @@ CHGF3:
 	push	ix
 	pop	de
 	inc	de
-	inc	de  ;DE must point to DSK_CURRENT_FILE_DEVICE_INDEX in work area
-	ld	bc,8
+	inc	de  ;DE must point to DSK_CURRENT_FILE_DEVICE_NUMBER in work area
+	ld	bc,7
+	ldi	;Copy device number, skip unused field (was LUN number in Nextor 2), then copy rest of data
+	inc hl
 	ldir
 
-    ld a,(ix+DSK_CURRENT_FILE_DEVICE_INDEX##) ;set DSK_CURRENT_FILE_DEVICE_INDEX and DSK_CURRENT_FILE_LUN_INDEX as same of data file if 0
+    ld a,(ix+DSK_CURRENT_FILE_DEVICE_NUMBER##) ;set DSK_CURRENT_FILE_DEVICE_NUMBER same of data file if 0
     or a
     jr nz,CHGF4
-    ld a,(ix+EMU_DEV_AND_LUN##)
-    ld b,a
-    and 00000111b
-    ld (ix+DSK_CURRENT_FILE_DEVICE_INDEX##),a
-    ld a,b
-    rrca
-    rrca
-    rrca
-    rrca
-    and 00000111b
-    ld (ix+DSK_CURRENT_FILE_LUN_INDEX##),a
+    ld a,(ix+EMU_FILE_DEVICE_NUMBER##)
+	and 01111111b
+    ld (ix+DSK_CURRENT_FILE_DEVICE_NUMBER##),a
 
-CHGF4:
+CHGF4::
 	xor	a
 	ret
 
@@ -311,9 +295,9 @@ DO_DIRCALL:
 DIO_ENTRY::
 	push	af
 	call	GET_KERNEX_DOS1_PNT
-	jp	nc,DIO_ENTRY_DO
+	jp	nc,DRV_ERROR_12
 
-	ld	a,(iy+UD1_DEVICE_INDEX##)
+	ld	a,(iy+UD1_DEVICE_NUMBER##)
 	or	a
 	jp	z,DISKERR
 
@@ -404,12 +388,9 @@ DIOEN3:
     ;   for the drive in KERNEX_DOS1.
     ;
     ; The following code is common to both cases, that's why
-    ; device index, LUN index and first sector number must be stored
+    ; device number, and first sector number must be stored
     ; at the same offset in both the KERNEX_DOS1 entries (UD1_*)
     ; and the disk emulation work area (DSK_*).
-
-	ld	a,1
-	ld	(KSLOT##),a	;KSLOT=1 -> device-based
 
 	push	hl
 	ld	l,(iy+UD1_FIRST_ABSOLUTE_SECTOR##)
@@ -427,24 +408,8 @@ DIOEN3:
 	pop	hl		;Restore transfer address
 	ld	de,TMP_SEC##
 	
-	ld	c,(iy+UD1_LUN_INDEX##) ;Set LUN index
 	pop	af                   ;From here Cy must be kept untouched
-	ld	a,(iy+UD1_DEVICE_INDEX##) ;Set device index
-	jr	DIO_ENTRY_DO_2
-
-		
-;From here, the processing is almost the same for device-based drivers
-;and for drive-based drivers, since the relevant parameters are almost the same
-;(B for the sector count, HL for the transfer address, A and C are not touched).
-;The only thing to take in account, is that for drive-based, DE contains
-;the sector number; and for device-based, DE is a pointer to a 32 bit sector number.
-;We use KSLOT to handle this difference.
-
-DIO_ENTRY_DO:
-	xor	a
-	ld	(KSLOT##),a	;KSLOT=0 -> drive-based
-	pop	af
-DIO_ENTRY_DO_2:
+	ld	a,(iy+UD1_DEVICE_NUMBER##) ;Set device number
 
 	; If the transfer starts and ends in page 0,
 	; ir of it starts in page 2 or 3,
@@ -572,26 +537,10 @@ DIO_NOP1:
 	jp	CONV_ERR
 
 
-;This subroutine increases the sector number by one.
+;This subroutine increases the 4 byte sector number pointed by DE by one.
 ;Corrupts AF, IX.
 
 DIO_INC_DE:
-	ld	a,(KSLOT##)
-	or	a
-	jr	nz,DIO_INC_DE_DVB
-
-	;Drive-based: simply increment DE.
-	;Note that C can't hold sector number,
-	;since this will be called in DOS 1 mode only,
-	;and DOS 1 does not support FAT16,
-	;so sector numbers are always 16 bit.
-
-	inc	de
-	ret
-
-	;Device-based: increment the 32 bit number pointed by DE
-
-DIO_INC_DE_DVB:
 	push	hl
 	push	de
 	pop	ix
@@ -612,6 +561,12 @@ DIO_INC_DE_DVB_END:
 	pop	hl
 	ret
 
+DRV_ERROR_12:
+	pop af
+	ld a,12	;"Other error"
+	scf
+	ret
+
 ;-----------------------------------------------------------------------------
 ;
 	; General disk routines entry
@@ -620,11 +575,10 @@ DIO_INC_DE_DVB_END:
 
 CHG_ENTRY::
 	call	GET_KERNEX_DOS1_PNT
-	ld	ix,DV_CHGDSK##
-	jp	nc,DO_CALBNK
+	jp	nc,DRV_ERROR_12
 
 	ld	d,a
-	ld	a,(iy+UD1_DEVICE_INDEX##)
+	ld	a,(iy+UD1_DEVICE_NUMBER##)
 	or	a
 	jp	z,DISKERR
 
@@ -642,8 +596,8 @@ CHG_ENTRY::
 
 	xor	a
 	ld	ix,(KERNEX_DOS1##)
-	bit	7,(ix+EMU_DEV_AND_LUN##)
-	res	7,(ix+EMU_DEV_AND_LUN##)
+	bit	7,(ix+EMU_FILE_DEVICE_NUMBER##)
+	res	7,(ix+EMU_FILE_DEVICE_NUMBER##)
 	ld	b,1
 	ret	z
 	ld	a,d
@@ -653,7 +607,6 @@ CHG_ENTRY::
 
 CHGEN_NOEMU:
 
-	;Drive-based mapping:
 	;Return "changed" if partition has changed, "unchanged" otherwise
 
 	ld	a,(iy+UD1_RELATIVE_DRIVE##)
@@ -671,8 +624,7 @@ CHGEN_NOEMU:
 
 DPB_ENTRY::
 	call	GET_KERNEX_DOS1_PNT
-	ld	ix,DV_GETDPB##
-	jp	nc,DO_CALBNK
+	jp	nc,DRV_ERROR_12
 
 	call	IS_EMU
 	jr	nc,DO_MKDPB
@@ -704,9 +656,8 @@ DPBEN2:
 	ld	(TMP_SEC##+2),a
 	ld	a,(iy+UD1_FIRST_ABSOLUTE_SECTOR##+3)
 	ld	(TMP_SEC##+3),a
-	ld	a,(iy+UD1_DEVICE_INDEX##)
+	ld	a,(iy+UD1_DEVICE_NUMBER##)
 	ld	b,1
-	ld	c,(iy+UD1_LUN_INDEX##)
 	ld	de,TMP_SEC##
 	ld	hl,($SECBUF##)
 	or	a
@@ -728,31 +679,31 @@ DPBEN2:
 	;--- Format choice
 
 CHO_ENTRY::
-	call	GET_KERNEX_DOS1_PNT
-	ld	ix,DV_CHOICE##
-	jp	nc,DO_CALBNK
-	
-	ld	hl,781fh	;Formatting is no supported yet for device-based drivers
+	;call	GET_KERNEX_DOS1_PNT
+	;jp	nc,CHO_ENTRY_CANTFORMAT
+
+CHO_ENTRY_CANTFORMAT:
+	ld	hl,781fh	;Formatting is no supported yet for Nextor drivers
 	ret
 
 	;--- Format device
 
 FMT_ENTRY::
-	call	GET_KERNEX_DOS1_PNT
-	ld	ix,DV_CHOICE##
-	jp	nc,DO_CALBNK
-	
-	ld	a,16		;Formatting is no supported yet for device-based drivers
+	;call	GET_KERNEX_DOS1_PNT
+	;jp	nc,FMT_ENTRY_CANTFORMAT
+
+FMT_ENTRY_CANTFORMAT:
+	ld	a,16		;Formatting is no supported yet for Nextor drivers
 	scf
 	ret
 
 	;--- Motor off
 
 MOF_ENTRY::
-	call	GET_KERNEX_DOS1_PNT
-	ld	ix,DV_MTOFF##
-	jp	nc,DO_CALBNK
+	;call	GET_KERNEX_DOS1_PNT
+	;jp	nc,MOF_ENTRY_NOOP
 
+MOF_ENTRY_NOOP:
 	ret
 
 DO_CALBNK:
@@ -778,7 +729,7 @@ DIO_RNF:
 
 ;-----------------------------------------------------------------------------
 ;
-; Check if the relative drive pointer by A refers to a Nextor driver
+; Check if the relative drive pointed by A refers to a Nextor driver
 ; and we are in DOS 1 mode. If so, returns Cy=1 and IY=pointer to the
 ; table entry in KERNEX_DOS1. Otherwise (DOS 2 mode, or no Nextor driver) returns Cy=0.
 ; Corrupts IY, F.
@@ -857,6 +808,12 @@ IS_NOT_DVB:
 ; Corruputs: F
 
 IS_EMU:
+	push af
+	ld	a,(DOS_VER##)
+	or	a
+	jr nz,IS_NO_EMU
+	pop af
+
 	push	iy
 	ld	iy,(KERNEX_DOS1##)
 	bit	7,(iy)
@@ -864,6 +821,11 @@ IS_EMU:
 	scf
 	ret	nz
 	ccf
+	ret
+
+IS_NO_EMU:
+	pop af
+	or a
 	ret
 
 ;-----------------------------------------------------------------------------
@@ -908,8 +870,7 @@ ASSIGN_PARTITION:
 	pop hl
 	push hl
 
-	ld b,(iy+UD1_DEVICE_INDEX##)
-	ld c,(iy+UD1_LUN_INDEX##)
+	ld b,(iy+UD1_DEVICE_NUMBER##)
 	ld a,4
     ld d,0
 	ld	ix,AUTO_ASPART##
@@ -936,9 +897,8 @@ READ_BOOT:
 	ld	de,0
 	ld	(TMP_SEC##),de
 	ld	(TMP_SEC##+2),de
-	ld	a,(iy+UD1_DEVICE_INDEX##)
+	ld	a,(iy+UD1_DEVICE_NUMBER##)
 	ld	b,1
-	ld	c,(iy+UD1_LUN_INDEX##)
 	ld	de,TMP_SEC##
 	ld	hl,($SECBUF##)
 	or	a
@@ -948,8 +908,8 @@ READ_BOOT:
 
 ;-----------------------------------------------------------------------------
 ;
-; Convert the disk error returned by a device-based routine,
-; into its drive-based equivalent
+; Convert the disk error returned by a Nextor routine,
+; into its old MSX-DOS equivalent
 
 POP_CONV_ERR:
 	inc	sp
@@ -958,10 +918,6 @@ POP_CONV_ERR:
 CONV_ERR:
 	or	a
 	ret	z
-	;jr	c,CONVE2
-	;xor	a
-	;ret
-CONVE2:
 
 	push	bc
 	ld	b,0

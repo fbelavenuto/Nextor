@@ -269,7 +269,7 @@ ram_ad	defl	DATABASE
 	var1	P2_64K		; /  by anyone (including the system).
 	var1	P3_64K		;/
 
-    const   KERNEX_DOS1,P0_64K  ;Pointer to table of device-based drives for DOS1
+    const   KERNEX_DOS1,P0_64K  ;Pointer to table of Nextor drives for DOS1
     const   KSLOT,P2_64K  ;Slot of disk controller being called (used in DOS 1 mode)
 ;
 	var1	NXT_VER		;Nextor version numbr
@@ -568,21 +568,6 @@ ram_ad	defl	4100h
 	var3    DV_CONFIG
 	spare	12
 	
-	;Routines for drive-based and device-based drivers
-
-	var0	DV_DSKIO
-	var3	DEV_RW
-	var0	DV_CHGDSK
-	var3	DEV_INFO
-	var0	DV_GETDPB
-	var3	DEV_STATUS
-	var0	DV_CHOICE
-	var3	LUN_INFO
-	var0	DV_FORMAT
-	var3	DEV_FORMAT
-	var0	DV_MTOFF
-	var3	DEV_CMD
-
 ;-----------------------------------------------------------------------------
 ;
 	module DRIVER

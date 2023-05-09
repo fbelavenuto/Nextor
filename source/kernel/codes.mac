@@ -139,7 +139,7 @@ name	 equ	 (value)		;; constants.
 	const	_GDLI,    79h	;Get information about drive letter
 	const	_GPART,   7Ah	;Get information about disk partition
 	const	_CDRVR,	  7Bh	;Call a routine in a disk driver
-	const	_MAPDRV,  7Ch   ;Map a drive letter to a drive or device/LUN/partition
+	const	_MAPDRV,  7Ch   ;Map a drive letter to a drive or device/partition
 
 	const	_Z80MODE, 7Dh	;Enable or disable the Z80 access mode for a driver
     const   _GETCLUS, 7Eh   ;Get information about a cluster on a FAT drive
@@ -229,7 +229,7 @@ name	 equ	 (value)		;; constants.
 	const	.IFCB,  0B7h	;Invalid FCB
 
 	const	.IDRVR, 0B6h	;Invalid device driver
-	const	.IDEVL, 0B5h	;Invalid device or LUN
+	const	.IDEVN, 0B5h	;Invalid device number
 	const	.IPART, 0B4h	;Invalid partition number
 	const	.PUSED, 0B3h	;Partition is already in use
 	const	.FMNT,  0B2h	;File is mounted

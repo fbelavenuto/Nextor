@@ -240,8 +240,8 @@ UFM_MT	equ		(1 SHL UF_MNT)
 ;                 BITS IN "UD_DFLAGS" VARIABLE
 ;               ================================
 ;
-UF_DBD	equ	0	;Set => drive assigned to a device-based driver
-UF_HPL	equ	1	;Set => device supports hot-plug
+UF_DBD	equ	0	;Set => drive assigned to a Nextor driver
+UF_HPL	equ	1	;Set => unused (was defined as "device supports hot-plug" in Nextor 2)
 UF_RMV	equ	2	;Set => drive assigned to a removable device
 UF_PAP	equ	3	;Set => drive is pending partition assignment
 UF_FOK	equ	4	;Set => value at UD_FSEC is valid
@@ -257,12 +257,6 @@ UFM_FO	equ	(1 SHL UF_FOK)
 
 NUMKEYS	equ	0FCBBh
 
-
-;                 DRIVER CONFIGURATION KEYS
-;               =============================
-
-CFG_DRVS   equ 1
-CFG_DEVLUN equ 2
 
 ;-----------------------------------------------------------------------------
 ;

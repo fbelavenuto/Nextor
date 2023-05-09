@@ -3441,7 +3441,7 @@ DERR_TAB:
 
 	DERNUM	ERRPUS	; Partition already in use
 	DERNUM	ERRIPA	; Invalid partition
-	DERNUM	ERRIDL	; Invalid device or LUN
+	DERNUM	ERRIDV	; Invalid device
 	DERNUM	ERRIDR	; Invalid driver
 
 	DERNUM	*		; ??? (B7h)
@@ -3588,7 +3588,7 @@ QQQQ	defl	DERFST
 	DERMAK	DERRAE		;RAM disk already exists
 
 	DERMAK	ERRIDR	; Invalid driver
-	DERMAK	ERRIDL	; Invalid device or LUN
+	DERMAK	ERRIDV	; Invalid device number
 	DERMAK	ERRIPA	; Invalid partition
 	DERMAK	ERRPUS	; Partition already in use
 
@@ -3976,7 +3976,7 @@ DERMSG:	defb	0
 	defb	'RAM disk already exists', 0
 
 	defb	'Invalid device driver',   0
-	defb	'Invalid device or LUN',   0
+	defb	'Invalid device number',   0
 	defb	'Invalid partition number',0
 	defb	'Partition already in use',0
 

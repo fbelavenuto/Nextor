@@ -136,10 +136,14 @@ typedef struct {
 
 #define CALLB0 0x403F
 #define CALBNK 0x4042
+
+//Nextor 2
 #define DEV_RW 0x4160
 #define DEV_INFO 0x4163
 #define LUN_INFO 0x4169
 
+// Nextor 3
+#define READ_WRITE 0x4137
 
 #define BK4_ADD 0xF1D0
 

@@ -1,4 +1,4 @@
-	; Device-based driver for the sunrise IDE interface for Nextor
+	; Driver for the sunrise IDE interface for Nextor
 	;
 	; Version Beta 5 by Piter Punk
 	; Based on version 0.1 by Konamiman
@@ -172,7 +172,7 @@ CHGET	equ	009Fh
 .UFORM	equ	0F7h
 .SEEK	equ	0F3h
 .IFORM	equ	0F0h
-.IDEVL	equ	0B5h
+.IDEVN	equ	0B5h
 .IPARM	equ	08Bh
 
 ;-----------------------------------------------------------------------------
@@ -443,7 +443,7 @@ CHPUT: jp (iy)
 
 	;--- Device query
 	;    Input:  A = Query index
-	;            C = Device index
+	;            C = Device number
 	;            F, B, DE, HL = Depends on the query
 	;    Output: A = Error code:
 	;                QUERY_OK: success
@@ -495,7 +495,7 @@ DO_DEVQ_GET_STRING:
 	ret
 DO_DEVQ_GET_STRING_2:
 
-	ld a,c	;Device index
+	ld a,c	;Device number
 	push de
 	call NEXTOR2_DEV_INFO
 	pop de
@@ -558,7 +558,9 @@ CUSTOM_DEVICE_QUERY:
 
 READ_WRITE:
 	ld c,1
-	jp NEXTOR2_DEV_RW
+	call NEXTOR2_DEV_RW
+	ld b,c
+	ret
 
 RETURN_NOT_IMP:
 	ld a,QUERY_NOT_IMPLEMENTED
@@ -1099,7 +1101,7 @@ DRV_DIRECT4:
 ;     B = 0 for DOS 2 mode, 1 for DOS 1 mode
 ;     C = Relative drive number at boot time
 ;   Output:
-;     B = Device index
+;     B = Device number
 ;     C = LUN index
 
 NEXTOR2_DRV_CONFIG:
@@ -1130,10 +1132,6 @@ DRV_CONFIG_2:
     ret
     
 
-;=====
-;=====  BEGIN of DEVICE-BASED specific routines
-;=====
-
 ;-----------------------------------------------------------------------------
 ;
 ; Read or write logical sectors from/to a logical unit
@@ -1146,7 +1144,7 @@ DRV_CONFIG_2:
 ;          DE = Address where the 4 byte sector number is stored
 ;Output:   A = Error code (the same codes of MSX-DOS are used):
 ;              0: Ok
-;              .IDEVL: Invalid device or LUN
+;              .IDEVN: Invalid device or LUN
 ;              .NRDY: Not ready
 ;              .DISK: General unknown disk error
 ;              .DATA: CRC error when reading
@@ -1333,7 +1331,7 @@ DEV_RW_NOSEC:
 DEV_RW_NODEV:
 	call	IDE_OFF
 	pop	af
-	ld	a,.IDEVL
+	ld	a,.IDEVN
 	ld	b,0
 	ret
 
@@ -1342,7 +1340,7 @@ DEV_RW_NODEV:
 ;
 ; Device information gathering
 ;
-;Input:   A = Device index, 1 to 7
+;Input:   A = Device number, 1 to 7
 ;         B = Information to return:
 ;             0: Basic information
 ;             1: Manufacturer name string
@@ -1352,7 +1350,7 @@ DEV_RW_NODEV:
 ;         D  = Buffer length (added in Nextor 3)
 ;Output:  A = Error code:
 ;             0: Ok
-;             1: Device not available or invalid device index
+;             1: Device not available or invalid device number
 ;             2: Information not available, or invalid information index
 ;         When basic information is requested,
 ;         buffer filled with the following information:
@@ -1376,7 +1374,7 @@ DEV_RW_NODEV:
 ; provided, not the leftmost.
 
 NEXTOR2_DEV_INFO:
-	or	a	;Check device index
+	or	a	;Check device number
 	jp	z,DEV_INFO_ERR1
 	cp	3
 	jp	nc,DEV_INFO_ERR1
@@ -1551,7 +1549,7 @@ DEV_STRING_SKIP:
 ;
 ; Obtain device status
 ;
-;Input:   A = Device index, 1 to 7
+;Input:   A = Device number, 1 to 7
 ;         B = Logical unit number, 1 to 7.
 ;             0 to return the status of the device itself.
 ;Output:  A = Status for the specified logical unit,
@@ -1564,7 +1562,7 @@ DEV_STRING_SKIP:
 ;                   since the last status request
 ;                   (for devices, the device has been unplugged and a
 ;                    different device has been plugged which has been
-;                    assigned the same device index; for logical units,
+;                    assigned the same device number; for logical units,
 ;                    the media has been changed).
 ;                3: The device or logical unit is available, but it is not
 ;                   possible to determine whether it has been changed
@@ -1601,12 +1599,12 @@ NEXTOR2_DEV_STATUS:
 ;
 ; Obtain logical unit information
 ;
-;Input:   A  = Device index, 1 to 7.
+;Input:   A  = Device number, 1 to 7.
 ;         B  = Logical unit number, 1 to 7.
 ;         HL = Pointer to buffer in RAM.
 ;Output:  A = 0: Ok, buffer filled with information.
 ;             1: Error, device or logical unit not available,
-;                or device index or logical unit number invalid.
+;                or device number or logical unit number invalid.
 ;         On success, buffer filled with the following information:
 ;
 ;+0 (1): Medium type:
@@ -1719,11 +1717,6 @@ LUN_INFO_ERROR:
 	call	IDE_OFF
 	ld	a,1
 	ret
-
-
-;=====
-;=====  END of DEVICE-BASED specific routines
-;=====
 
 
 ;=======================
@@ -1858,14 +1851,14 @@ MY_GWORK:
 
 ;-----------------------------------------------------------------------------
 ;
-; Check the device index and LUN
-; Input:  A = device index, B = lun
+; Check the device number and LUN
+; Input:  A = device number, B = lun
 ; Output: Cy=0 if OK, 1 if device or LUN invalid
 ;         IX = Work area for the device
 ; Modifies F, C
 
 CHECK_DEV_LUN:
-	or	a	;Check device index
+	or	a	;Check device number
 	scf
 	ret	z
 	cp	3

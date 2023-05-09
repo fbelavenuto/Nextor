@@ -2650,13 +2650,13 @@ NOCHCPU:
 	or	a
 	jr	nz,MK_EMU_TBL
 
-	;Build the table of drives attached to device-based drivers.
+	;Build the table of drives attached to Nextor drivers.
 	;We call AUTODRV on segment 4 to build the table in a
 	;fixed location (BUF_1), then we allocate space for the
 	;table in page 3 and copy the table here, prepended by
 	;a byte that tells how many entries are in the table.
 
-	ld	hl,0F980h	;(BUF_1##)
+	ld	hl,BOOT_TMP##
 	ld	(KERNEX_DOS1##),hl
 	ld	hl,AUTODRV##
 	ld	(BK4_ADD##),hl
@@ -2682,7 +2682,7 @@ OK_EMU_WK:
 	push	hl
 	ex	de,hl
 	ld	hl,EMU_TMP##
-	ld	bc,16
+	ld	bc,EMU_DESC_SIZE##
 	call	MEMCPY
 
 	pop	hl
@@ -2693,10 +2693,10 @@ OK_EMU_WK:
 	jr	END_DVB_TBL
 
 MK_DVB_TBL:
-	ld	hl,0F980h	;(BUF_1##)
+	ld	hl,BOOT_TMP##
 	ld	a,(hl)
 	or	a
-	jr	z,AUTODRV_OK2	;No drives for device-based drivers?
+	jr	z,AUTODRV_OK2	;No drives for Nextor drivers?
 
 	ld	b,a	;B = Number of entries in the table
 	add	a,a
@@ -2716,7 +2716,7 @@ AUTODRV_OK:
 
 	ld	(KERNEX_DOS1##),hl
 	ex	de,hl
-	ld	hl,0F980h	;(BUF_1##)
+	ld	hl,BOOT_TMP##
 	ldir
 
 AUTODRV_OK2:
