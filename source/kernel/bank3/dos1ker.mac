@@ -8833,6 +8833,7 @@ MOREFS:
 
 	db	0
 
+
 ; CALL FDISK handler.
 
 NEWSTT	equ	04601h
@@ -8840,22 +8841,13 @@ CALBAS	equ	0159h		;call a BASIC routine in ROM
 
 DO_FDISK:
 	push	hl
-	ld	a,5
-	ld	ix,04100h
+
+	xor a
+	ld ix,FDISK##
 	call	CALBNK##
+
 	pop	hl
-
-	ld	hl,NEWTXT
-	ld	de,09000h
-	ld	bc,3
-	ldir
-	ld	hl,09000h
-	ld	ix,NEWSTT
-	call	CALBAS
-	ei
 	ret
-
-NEWTXT:	db	3ah, 94h, 0	; ":NEW"
 
 
 ; Extra CALL handlers.

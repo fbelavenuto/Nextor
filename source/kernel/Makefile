@@ -325,7 +325,6 @@ nextor_base.dat: \
 	bank4/B4RD.BIN \
 	bank5/B5.BIN \
 	bank5/fdisk.dat \
-	bank5/fdisk2.dat \
 	bank6/B6.BIN
 
 	cat bank0/B0.BIN 255.bytes bank1/B1.BIN 255.bytes bank2/B2.BIN bank3/B3.BIN 255.bytes bank4/B4.BIN 255.bytes bank5/B5.BIN 255.bytes bank6/B6.BIN > nextor_base.dat
@@ -335,8 +334,7 @@ nextor_base.dat: \
 	dd conv=notrunc if=doshead.BIN of=nextor_base.dat bs=1 count=255 seek=64k
 	dd conv=notrunc if=doshead.BIN of=nextor_base.dat bs=1 count=255 seek=80k
 	dd conv=notrunc if=doshead.BIN of=nextor_base.dat bs=1 count=255 seek=96k
-	dd conv=notrunc if=bank5/fdisk.dat of=nextor_base.dat bs=1 count=16000 seek=82176
-	dd conv=notrunc if=bank5/fdisk2.dat of=nextor_base.dat bs=1 count=8000 seek=98560
+	dd conv=notrunc if=bank5/fdisk.dat of=nextor_base.dat bs=1 count=16048 seek=82176
 	dd conv=notrunc if=bank4/B4RD.BIN of=nextor_base.dat bs=1 count=15 seek=65664
 
 	$(call copy_to_bin,nextor_base.dat,Nextor-$(VERSION).base.dat)
@@ -389,7 +387,7 @@ bank0/b0labels.inc: \
 bank0/b0lab_b3.inc: \
 	bank0/B0.SYM
 
-	$(call SymToEqus,bank0/B0.SYM,bank0/b0lab_b3.inc,INIT|TIMINT|MAPBIO|GWRK|R_[^[:space:]]+)
+	$(call SymToEqus,bank0/B0.SYM,bank0/b0lab_b3.inc,INIT|TIMINT|MAPBIO|GWRK|FDISK|R_[^[:space:]]+)
 
 
 ###  Bank 1
@@ -533,7 +531,7 @@ bank6/B6.BIN: \
 			--code 40FFh ../codes.rel ../kvar.rel ../data.rel b6.rel \
 			--code 7fd0h ../chgbnk.rel
 
-bank5/fdisk.dat bank5/fdisk2.dat: \
+bank5/fdisk.dat: \
 	bank5/fdisk_crt0.rel \
 	bank5/fdisk.h \
 	bank5/fdisk.c \

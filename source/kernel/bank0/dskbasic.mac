@@ -701,8 +701,27 @@ NUMINT:
 ;
 FDISK::
 
-	;ret	nz
 	push	hl
+
+	ld hl,(TXTTAB)
+	ld a,(hl)
+	inc hl
+	ld h,(hl)
+	or h
+	jr z,DO_FDISK_OK
+
+	ld hl,FDISK_PROGRAM_EXISTS_WARNING
+	call PRINT_HL
+	pop hl
+	ei
+	ret
+
+FDISK_PROGRAM_EXISTS_WARNING:
+	db "There's a BASIC program in memory!",13,10
+	db "Save it if you want to keep it,",13,10
+	db "delete it with NEW, then try again.",0
+
+DO_FDISK_OK:
 	ld	a,5
 	ld	ix,04100h
 	call	CALBNK##

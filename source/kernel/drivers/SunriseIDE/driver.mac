@@ -505,9 +505,9 @@ DO_DEVQ_GET_STRING_2:
 	;IDE strings are 20 char long, so if buffer was at least 21 bytes long
 	;assume success, otherwise assume string was truncated
 	ld a,d
-	cp 22
+	cp 21
 	ld a,0
-	ret c
+	ret nc
 	ld a,QUERY_TRUNCATED_STRING
 	ret
 
@@ -1392,7 +1392,7 @@ NEXTOR2_DEV_INFO:
 
 	ld	a,(ix)
 	or	a	;Device available?
-	jr	z,DEV_INFO_ERR1
+	jp	z,DEV_INFO_ERR1
 
 	ld	(hl),1	;One single LUN
 	inc	hl
@@ -1404,6 +1404,7 @@ NEXTOR2_DEV_INFO:
 
 DEV_INFO_STRING:
 	push de		;Save buffer length
+	ld a,d
 
 	push	hl
 	push	bc
@@ -1411,7 +1412,7 @@ DEV_INFO_STRING:
 	pop	de
 	inc	de
 	ld	(hl)," "
-	ld	c,d
+	ld	c,a
 	ld  b,0
 	dec bc
 	ldir
@@ -1449,7 +1450,7 @@ DEV_STRING_DO:
 	dec a	;Don't count terminating 0
 	cp 21
 	ld b,a
-	jr nz,DEV_STRING_LOOP
+	jr c,DEV_STRING_LOOP
 	ld b,20
 DEV_STRING_LOOP:
 	ld	de,(IDE_DATA)
@@ -1460,6 +1461,8 @@ DEV_STRING_LOOP:
 	jr	c,DEVSTRLOOP_1
 	ld	a," "
 DEVSTRLOOP_1:
+	dec b
+	jr z,DEVSTR_END
 	ld	(hl),a
 	inc	hl
 	ld	a,e
@@ -1472,6 +1475,7 @@ DEVSTRLOOP_2:
 	ld	(hl),a
 	inc	hl
 	djnz	DEV_STRING_LOOP
+DEVSTR_END:	
 	ld (hl),0	;Terminating 0
 
 	call	IDE_OFF
@@ -1525,13 +1529,14 @@ DEV_STING_PREPARE:
 	pop de
 	ret	c
 
+	ld a,d
 	push	hl		;Fill destination with spaces
 	push	bc
 	push	hl
 	pop	de
 	inc	de
 	ld	(hl)," "
-	ld	c,d
+	ld	c,a
 	ld b,0
 	dec bc
 	ldir
