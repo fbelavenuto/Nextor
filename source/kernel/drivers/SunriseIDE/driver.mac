@@ -473,6 +473,8 @@ DEVICE_QUERY:
 	jr z,DO_DEVQ_GET_PARAMS
 	dec a
 	jr z,DO_DEVQ_GET_STATUS
+	dec a
+	jr z,DO_DEVQ_GET_AVAILABILITY
 	ld a,QUERY_NOT_IMPLEMENTED
 	ret
 
@@ -542,6 +544,7 @@ DO_DEVQ_GET_PARAMS:
 	ret
 
 DO_DEVQ_GET_STATUS:
+DO_DEVQ_GET_AVAILABILITY:
 	ld a,c
 	ld b,1
 	call NEXTOR2_DEV_STATUS
@@ -1420,6 +1423,7 @@ DEV_INFO_STRING:
 	pop	hl
 
 	call	IDE_ON
+	pop de	;Buffer length
 
 	ld	a,c
 	dec	a
@@ -1439,37 +1443,55 @@ DEV_INFO_STRING2:
 	jr	nz,DEV_STRING_NO1
 
 	ld	b,27
-	pop de
 	push de
 	call	DEV_STING_PREPARE
+	pop de
 	jr	c,DEV_INFO_ERR1
 
 DEV_STRING_DO:
-	pop de
 	ld a,d
 	dec a	;Don't count terminating 0
 	cp 21
 	ld b,a
-	jr c,DEV_STRING_LOOP
+	jr c,DEV_STRING_SKIP_SPACES
 	ld b,20
+
+DEV_STRING_SKIP_SPACES:
+	ld	de,(IDE_DATA)
+	ld	a,d
+	cp 33
+	jr nc,DEV_STRING_LOOP_NOSPACE_1
+	dec b
+	jr z,DEVSTR_END
+	ld	a,e
+	cp 33
+	jr nc,DEV_STRING_LOOP_NOSPACE_2
+	dec b
+	jr z,DEVSTR_END
+	jr DEV_STRING_SKIP_SPACES
+
 DEV_STRING_LOOP:
 	ld	de,(IDE_DATA)
 	ld	a,d
-	cp	33
-	jr	nc,DEVSTRLOOP_1
-	cp	126
+DEV_STRING_LOOP_NOSPACE_1:
+	cp	32
+	jr c,DEVSTRLOOP_1_CTRL
+	cp	127
 	jr	c,DEVSTRLOOP_1
+DEVSTRLOOP_1_CTRL:
 	ld	a," "
 DEVSTRLOOP_1:
-	dec b
-	jr z,DEVSTR_END
 	ld	(hl),a
 	inc	hl
+	dec b
+	jr z,DEVSTR_END
 	ld	a,e
-	cp	33
-	jr	nc,DEVSTRLOOP_2
-	cp	126
+DEV_STRING_LOOP_NOSPACE_2:
+	cp	32
+	jr	c,DEVSTRLOOP_2_CTRL
+	cp	127
 	jr	c,DEVSTRLOOP_2
+DEVSTRLOOP_2_CTRL:	
 	ld	a," "
 DEVSTRLOOP_2:
 	ld	(hl),a
@@ -1490,11 +1512,11 @@ DEV_STRING_NO1:
 	jr	nz,DEV_INFO_ERR2	;Unknown string
 
 	ld	b,10
+	push de
 	call	DEV_STING_PREPARE
+	pop de
 	jr	c,DEV_INFO_ERR1
 
-	ld	bc,44
-	add	hl,bc	;Since the string is 20 chars long
 	ld	b,10
 	jr	DEV_STRING_DO
 	

@@ -592,6 +592,7 @@ ram_ad	defl	4100h
 
 	const QUERY_OK,0
 	const QUERY_TRUNCATED_STRING,1
+	const QUERY_INVALID_DEVICE,2
 	const QUERY_NOT_IMPLEMENTED,255
 
 	const DRVQ_GET_VERSION,1
@@ -607,6 +608,7 @@ ram_ad	defl	4100h
 	const DEVQ_GET_STRING,1
 	const DEVQ_GET_PARAMS,2
 	const DEVQ_GET_STATUS,3
+	const DEVQ_GET_AVAILABILITY,4
 
 	endmod
 

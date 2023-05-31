@@ -485,7 +485,7 @@ void GetDevicesInformation()
 		currentDevice = &devices[deviceIndex];
 		currentDevice->isOnline = true;
 
-		regs.Bytes.A = DEVQ_GET_STATUS;
+		regs.Bytes.A = DEVQ_GET_AVAILABILITY;
 		regs.Bytes.C = currentDevice->deviceNumber;
 		DriverCall(selectedDriver->slot, DEVICE_QUERY);
 
@@ -498,7 +498,7 @@ void GetDevicesInformation()
 		if(regs.Bytes.A != 0) {
 			//Should never happen if the driver is consistent
 			//(for a given device number it either returns "Invalid device" error for
-			//all three of DEVQ_GET_STRING, DEVQ_GET_STATUS and DEVQ_GET_PARAMS,
+			//all the queries invoked through the DEVICE_QUERY routine,
 			//or for none of them)
 			currentDevice->isValid = false;
 		}
@@ -526,7 +526,7 @@ void GetDevicesInformation()
 			else if(regs.Bytes.A != 0) {
 				//Should never happen if the driver is consistent
 				//(for a given device number it either returns "Invalid device" error for
-				//all three of DEVQ_GET_STRING, DEVQ_GET_STATUS and DEVQ_GET_PARAMS,
+				//all the queries invoked through the DEVICE_QUERY routine,
 				//or for none of them)
 				currentDevice->isValid = false;
 			}

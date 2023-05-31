@@ -597,6 +597,22 @@ For fixed devices the routine can return either QUERY_NOT_IMPLEMENTED, or QUERY_
 This is the same as the old DEV_STATUS, but device id is passed in C instead of A, there's no LUN index, and error codes differ.
 Also the behavior when input is a non existing device is different (previously it would return a status of 0, now it returns QUERY_INVALID_DEVICE).
 
+-----
+
+4: Get device availability
+
+Input: -
+Output: A = QUERY_OK: ok, device information provided
+            QUERY_INVALID_DEVICE: device does not exist
+            QUERY_NOT_IMPLEMENTED: query not implemented or device isn't removable
+         B = Status for the specified device:
+             0: The device exists but is not available at the moment
+			    (typically this means: removable device with no medium inserted)
+             1: The device is available
+
+QUERY_NOT_IMPLEMENTED is interpreted as retruning B=1.
+
+This is the same as "Get device status" but it only returns B=0 or B=1, and it does not change the "changed" status.
 \
 
 	end
