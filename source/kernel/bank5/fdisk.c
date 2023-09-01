@@ -440,14 +440,18 @@ void GetDevicesInformation()
 	byte deviceNumber;
     deviceInfo* currentDevice = &devices[0];
 	char* currentDeviceName;
+	byte maxDeviceNumber;
 	byte maxDeviceNameLength = (is80ColumnsDisplay ? DRIVER_NAME_LENGTH_80 : DRIVER_NAME_LENGTH_40) + 1;
+
+	regs.Bytes.A = DRVQ_GET_MAX_DEVICE_NUMBER;
+	DriverCall(selectedDriver->slot, DRIVER_QUERY);
+	maxDeviceNumber = regs.Bytes.A == 0 ? regs.Bytes.B : DEFAULT_MAX_DEVICE_NUMBER;
 
     availableDevicesCount = 0;
 	deviceIndex = 0;
 	deviceNumber = 1;
 
-	while(deviceIndex < MAX_DEVICES_PER_DRIVER && deviceNumber < 255) {
-		currentDevice = &devices[deviceIndex];
+	while(deviceIndex < MAX_DEVICES_PER_DRIVER && deviceNumber <= maxDeviceNumber) {
 		currentDevice->deviceNumber = deviceNumber;
 		currentDeviceName = currentDevice->deviceName;
 
@@ -458,7 +462,6 @@ void GetDevicesInformation()
 		regs.Words.HL = (int)currentDeviceName;
 		DriverCall(selectedDriver->slot, DEVICE_QUERY);
 
-		deviceIndex++;
 		deviceNumber++;
 
 		if(regs.Bytes.A == ERR_QUERY_NOT_IMPLEMENTED) {
@@ -473,6 +476,9 @@ void GetDevicesInformation()
 
 		currentDevice->isValid = true;
 		availableDevicesCount++;
+
+		deviceIndex++;
+		currentDevice = &devices[deviceIndex];
 	}
 
 	if(availableDevicesCount == 0) {
