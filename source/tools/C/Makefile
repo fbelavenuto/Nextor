@@ -11,7 +11,7 @@ define copy_to_bin
 	cp $(1) ../../../bin/tools/$(2)
 endef
 
-COMS := emufile.com fsize.com nexboot.com vsft.com
+COMS := emufile.com fsize.com nexboot.com vsft.com drvtest.com
 
 c-tools: $(COMS)
 
@@ -29,18 +29,26 @@ prerequisites:
 .SECONDEXPANSION:
 $(COMS): \
 	$$(patsubst %.com,%.c,$$@) \
-	crt0_msxdos_advanced.rel
+	crt0_msxdos_advanced.rel \
+	asmcall.h
 
 	sdcc --code-loc 0x180 --data-loc 0 -mz80 --disable-warning 196 --disable-warning 85 --no-std-crt0 crt0_msxdos_advanced.rel $(patsubst %.com,%.c,$@)
 	$(call hex2bin,$(patsubst %.com,%.ihx,$@),$@)
 	$(call copy_to_bin,$@)
+
+	sudo mount -o loop,uid=konamiman,gid=konamiman /mnt/c/Users/nesto/Documents/nextor.dsk /home/konamiman/floppy
+	cp $@ /home/konamiman/floppy
+	sudo umount /home/konamiman/floppy
 
 crt0_msxdos_advanced.rel: \
 	crt0_msxdos_advanced.s
 
 	sdasz80 -o crt0_msxdos_advanced.rel crt0_msxdos_advanced.s
 
-.PHONY: clean
+.PHONY: clean umount
 
 clean:
 	for ext in asm hex ihx lk lst map noi sym rel com; do find . -type f -name "*.$$ext" -delete; done
+
+umount:
+	sudo umount /home/konamiman/floppy

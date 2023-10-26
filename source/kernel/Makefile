@@ -224,12 +224,14 @@ mfrsd: \
 	drivers/MegaFlashRomSD/Nextor-$(VERSION).MegaFlashSDSCC.2-slots.Recovery.ROM \
 
 drivers/MegaFlashRomSD/mfrsd-1slot.bin: \
-	drivers/MegaFlashRomSD/mfrsd.asm
+	drivers/MegaFlashRomSD/mfrsd.asm \
+	drivers/MegaFlashRomSD/romdisk.asm
 
 	$(call assemble_as,drivers/MegaFlashRomSD/mfrsd.asm,$$/mfrsd-1slot.bin,--build-type abs --output-file-extension bin --define-symbols NUM_SLOTS=1)
 
 drivers/MegaFlashRomSD/mfrsd-2slots.bin: \
-	drivers/MegaFlashRomSD/mfrsd.asm
+	drivers/MegaFlashRomSD/mfrsd.asm \
+	drivers/MegaFlashRomSD/romdisk.asm
 
 	$(call assemble_as,drivers/MegaFlashRomSD/mfrsd.asm,$$/mfrsd-2slots.bin,--build-type abs --output-file-extension bin --define-symbols NUM_SLOTS=2)
 
